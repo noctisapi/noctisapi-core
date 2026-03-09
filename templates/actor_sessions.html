@@ -5,15 +5,15 @@
 <div class="page-head">
   <div>
     <h1>Sessions for {{ actor.short }}</h1>
-    <div class="sub">Últimas sesiones vistas el {{ actor.last_seen_fmt }}</div>
+    <div class="sub">Last activity: {{ actor.last_seen_fmt }}</div>
   </div>
   <div class="kpis">
     <div class="kpi">
-      <div class="kpi-label">Total</div>
+      <div class="kpi-label">Sessions</div>
       <div class="kpi-value">{{ sessions|length }}</div>
     </div>
     <div class="kpi">
-      <div class="kpi-label">Eventos</div>
+      <div class="kpi-label">Events</div>
       <div class="kpi-value">{{ debug.event_count }}</div>
     </div>
   </div>
@@ -29,30 +29,35 @@
       <table class="table table-sortable">
         <thead>
           <tr>
-            <th data-type="text">ID</th>
+            <th data-type="text" style="width:120px;">ID</th>
             <th data-type="date">Started</th>
             <th data-type="date">Ended</th>
-            <th data-type="number">Stage Max</th>
+            <th data-type="number" style="width:100px;">Stage</th>
+            <th data-type="number" style="width:80px;">Steps</th>
             <th data-type="text">Summary</th>
-            <th data-type="text"></th>
+            <th style="width:80px;"></th>
           </tr>
         </thead>
         <tbody>
           {% for s in sessions %}
+          {% set stage = s.stage_max|default(0) %}
           <tr>
-            <td class="mono clip">{{ s.session_id }}</td>
+            <td class="mono" style="font-size:0.8rem;">{{ s.session_id[:12] }}…</td>
             <td class="mono">{{ s.started_fmt }}</td>
-            <td class="mono">{{ s.ended_fmt or '-' }}</td>
-            <td><span class="pill">S{{ s.stage_max|default(0) }}</span></td>
-            <td>{{ s.summary or '-' }}</td>
-            <td><a class="btn btn-outline" href="/dashboard/sessions/{{ s.session_id }}">View</a></td>
+            <td class="mono">{{ s.ended_fmt or '—' }}</td>
+            <td>
+              <span class="pill{% if stage >= 4 %} pill-danger{% elif stage >= 2 %} pill-warn{% endif %}">S{{ stage }}</span>
+            </td>
+            <td class="mono">{{ s.step_count|default(0) }}</td>
+            <td class="muted" style="font-size:0.83rem;">{{ s.summary or '—' }}</td>
+            <td><a class="btn btn-outline btn-small" href="/dashboard/sessions/{{ s.session_id }}">View</a></td>
           </tr>
           {% endfor %}
         </tbody>
       </table>
     </div>
   {% else %}
-    <div class="case-empty" style="margin:14px;">Sin sesiones registradas para este actor.</div>
+    <div class="case-empty" style="margin:14px;">No sessions recorded for this actor.</div>
   {% endif %}
 </div>
 

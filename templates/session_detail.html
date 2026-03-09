@@ -4,7 +4,7 @@
 <div class="page-head">
   <div>
     <h1>Session {{ session.session_id }}</h1>
-    <div class="sub">Actor {{ session.actor_id }} - Stage {{ session.stage_max or 0 }}</div>
+    <div class="sub">Actor {{ session.actor_id }} &middot; Stage {{ session.stage_max or 0 }}</div>
   </div>
   <div class="kpis">
     <div class="kpi">
@@ -17,7 +17,19 @@
     </div>
     <div class="kpi">
       <div class="kpi-label">Duration</div>
-      <div class="kpi-value">{{ session.duration_seconds or '-' }}s</div>
+      <div class="kpi-value">
+        {% if session.duration_seconds is not none %}
+          {{ session.duration_seconds }}s
+        {% elif session.duration_ms is not none %}
+          {{ session.duration_ms }}ms
+        {% else %}
+          -
+        {% endif %}
+      </div>
+    </div>
+    <div class="kpi">
+      <div class="kpi-label">Steps</div>
+      <div class="kpi-value">{{ steps|length }}</div>
     </div>
   </div>
 </div>
@@ -39,16 +51,51 @@
 
 <div class="card">
   <div class="card-head"><div class="card-title">Steps ({{ steps|length }})</div></div>
+  <div style="padding:8px 14px;border-bottom:1px solid var(--stroke);display:flex;gap:8px;flex-wrap:wrap;align-items:center;">
+    <select id="filterMethod" class="table-filter" style="width:120px;flex:none;" onchange="applyStepFilters()" aria-label="Filter method">
+      <option value="">All methods</option>
+      <option>GET</option>
+      <option>POST</option>
+      <option>PUT</option>
+      <option>DELETE</option>
+      <option>PATCH</option>
+      <option>HEAD</option>
+      <option>OPTIONS</option>
+      <option>CONNECT</option>
+      <option>TRACE</option>
+    </select>
+    <select id="filterStage" class="table-filter" style="width:100px;flex:none;" onchange="applyStepFilters()" aria-label="Filter stage">
+      <option value="">All stages</option>
+      <option value="0">S0</option>
+      <option value="1">S1</option>
+      <option value="2">S2</option>
+      <option value="3">S3</option>
+      <option value="4">S4</option>
+      <option value="5">S5</option>
+      <option value="6">S6</option>
+      <option value="7">S7</option>
+      <option value="8">S8</option>
+    </select>
+    <input type="text" id="filterPath" class="table-filter" style="width:160px;flex:none;" placeholder="Filter path…" oninput="applyStepFilters()" aria-label="Filter path">
+    <select id="filterStatus" class="table-filter" style="width:110px;flex:none;" onchange="applyStepFilters()" aria-label="Filter status">
+      <option value="">All status</option>
+      <option value="1">1xx</option>
+      <option value="2">2xx</option>
+      <option value="3">3xx</option>
+      <option value="4">4xx</option>
+      <option value="5">5xx</option>
+    </select>
+    <span style="flex:1;min-width:4px;"></span>
+    <input type="checkbox" id="selectAllSteps" aria-label="Select all steps">
+    <button class="btn btn-ghost btn-small" type="button" onclick="selectAllSteps(true)">Select all</button>
+    <button class="btn btn-ghost btn-small" type="button" onclick="selectAllSteps(false)">Clear</button>
+    <span id="selectedCount" class="muted tiny-text"></span>
+  </div>
   <div class="table-wrap">
-    <div class="table-toolbar">
-      <button class="btn btn-ghost btn-small" type="button" onclick="selectAllSteps(true)">Select all</button>
-      <button class="btn btn-ghost btn-small" type="button" onclick="selectAllSteps(false)">Clear</button>
-      <span id="selectedCount" class="muted tiny-text"></span>
-    </div>
-    <table class="table table-sortable" id="stepsTable">
+    <table class="table table-sortable" id="stepsTable" data-no-filters>
       <thead>
         <tr class="header">
-          <th data-type="text"><input type="checkbox" id="selectAllSteps" aria-label="Select all steps"></th>
+          <th data-type="text" style="width:32px;"></th>
           <th data-type="number">#</th>
           <th data-type="date">Timestamp</th>
           <th data-type="text">Method</th>
@@ -57,21 +104,11 @@
           <th data-type="number">Status</th>
           <th data-type="text">Actions</th>
         </tr>
-        <tr class="table-filters">
-          <th></th>
-          <th><input class="table-filter" data-col="1" placeholder="Filter #" aria-label="Filter #"></th>
-          <th><input class="table-filter" data-col="2" placeholder="Filter timestamp" aria-label="Filter timestamp"></th>
-          <th><input class="table-filter" data-col="3" placeholder="Filter method" aria-label="Filter method"></th>
-          <th><input class="table-filter" data-col="4" placeholder="Filter path" aria-label="Filter path"></th>
-          <th><input class="table-filter" data-col="5" placeholder="Filter stage" aria-label="Filter stage"></th>
-          <th><input class="table-filter" data-col="6" placeholder="Filter status" aria-label="Filter status"></th>
-          <th><input class="table-filter" data-col="7" placeholder="Filter actions" aria-label="Filter actions"></th>
-        </tr>
       </thead>
       <tbody>
         {% for s in steps %}
         {% set stage = s.stage_after if s.stage_after is not none else s.stage_before %}
-        <tr>
+        <tr id="step-row-{{ s.id }}">
           <td><input type="checkbox" class="step-select" data-step-id="{{ s.id }}" data-step-seq="{{ s.seq }}" aria-label="Select step {{ s.seq }}"></td>
           <td>{{ s.seq }}</td>
           <td class="mono">{{ s.ts }}</td>
@@ -105,9 +142,31 @@
   }
 
   function selectAllSteps(checked){
-    document.querySelectorAll('.step-select').forEach(cb => { cb.checked = checked; });
+    document.querySelectorAll('.step-select:not(:disabled)').forEach(cb => { cb.checked = checked; });
     const master = document.getElementById('selectAllSteps');
     if(master){ master.checked = checked; }
+    updateSelectedCount();
+  }
+
+  function applyStepFilters() {
+    const method     = document.getElementById('filterMethod')?.value || '';
+    const stage      = document.getElementById('filterStage')?.value ?? '';
+    const path       = (document.getElementById('filterPath')?.value || '').toLowerCase();
+    const statusPfx  = document.getElementById('filterStatus')?.value || '';
+    document.querySelectorAll('#stepsTable tbody tr').forEach(tr => {
+      const cells = tr.querySelectorAll('td');
+      if (cells.length < 7) return;
+      const rowMethod  = cells[3].textContent.trim();
+      const rowPath    = cells[4].getAttribute('title') || cells[4].textContent.trim();
+      const stageTag   = cells[5].querySelector('.tag');
+      const rowStage   = stageTag ? stageTag.textContent.trim() : '';
+      const rowStatus  = cells[6].textContent.trim();
+      const matchMethod = !method    || rowMethod === method;
+      const matchPath   = !path      || rowPath.toLowerCase().includes(path);
+      const matchStage  = !stage     || rowStage === ('S' + stage);
+      const matchStatus = !statusPfx || rowStatus.startsWith(statusPfx);
+      tr.style.display = matchMethod && matchPath && matchStage && matchStatus ? '' : 'none';
+    });
     updateSelectedCount();
   }
 

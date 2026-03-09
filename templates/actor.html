@@ -17,7 +17,7 @@
       <div class="kpi-value">{{ actor.score }}</div>
     </div>
     <div class="kpi">
-      <div class="kpi-label">Visto</div>
+      <div class="kpi-label">Last Seen</div>
       <div class="kpi-value">{{ actor.last_seen_fmt }}</div>
     </div>
   </div>
@@ -26,16 +26,16 @@
 <div class="card actor-actions">
   <div class="actor-actions__info">
     <div class="actor-actions__eyebrow">Quick Actions</div>
-    <div class="actor-actions__title">Gestión express del actor</div>
-    <div class="actor-actions__subtitle">Archive or review this actor without leaving the page.</div>
+    <div class="actor-actions__title">Manage actor</div>
+    <div class="actor-actions__subtitle">Archive or review sessions.</div>
   </div>
   <div class="actor-actions__buttons">
-    <button class="btn btn-ghost" type="button" data-action="archive" data-busy-text="Actualizando..." onclick="archiveActor(this)">
+    <button class="btn btn-ghost" type="button" data-action="archive" data-busy-text="Updating..." onclick="archiveActor(this)">
       <span class="btn-label">{% if actor.is_archived %}Unarchive{% else %}Archive{% endif %}</span>
     </button>
     {% if actor.latest_session_id %}
     <a class="btn btn-outline" href="/dashboard/sessions/{{ actor.latest_session_id }}">
-      <span class="btn-label">Open Replay</span>
+      <span class="btn-label">Latest Session</span>
     </a>
     {% endif %}
     <a class="btn btn-outline" href="/dashboard/actors/{{ actor.actor_id }}/sessions">
@@ -45,7 +45,6 @@
 </div>
 
 <div id="actionToast" class="toast" role="status" aria-live="polite"></div>
-
 
 <!-- Tokens -->
 <div class="card">
@@ -82,7 +81,7 @@
       </table>
     </div>
   {% else %}
-    <div class="muted">Sin tokens</div>
+    <div class="muted">No tokens</div>
   {% endif %}
 </div>
 
@@ -110,7 +109,20 @@
             <th><input class="table-filter" data-col="0" placeholder="Filter timestamp" aria-label="Filter timestamp"></th>
             <th><input class="table-filter" data-col="1" placeholder="Filter icon" aria-label="Filter icon"></th>
             <th><input class="table-filter" data-col="2" placeholder="Filter kind" aria-label="Filter kind"></th>
-            <th><input class="table-filter" data-col="3" placeholder="Filter method" aria-label="Filter method"></th>
+            <th>
+              <select class="table-filter" data-col="3" aria-label="Filter method">
+                <option value="">All</option>
+                <option>GET</option>
+                <option>POST</option>
+                <option>PUT</option>
+                <option>DELETE</option>
+                <option>PATCH</option>
+                <option>HEAD</option>
+                <option>OPTIONS</option>
+                <option>CONNECT</option>
+                <option>TRACE</option>
+              </select>
+            </th>
             <th><input class="table-filter" data-col="4" placeholder="Filter path" aria-label="Filter path"></th>
             <th><input class="table-filter" data-col="5" placeholder="Filter IP" aria-label="Filter IP"></th>
             <th><input class="table-filter" data-col="6" placeholder="Filter token" aria-label="Filter token"></th>
@@ -137,11 +149,11 @@
       </table>
     </div>
   {% else %}
-    <div class="muted">Sin events</div>
+    <div class="muted">No events</div>
   {% endif %}
 </div>
 
-<!-- Auto-refresh (solo si la pestana esta visible) -->
+<!-- Auto-refresh (only when tab is visible) -->
 <script>
   const actor_id = "{{ actor.actor_id }}";
   let autoRefreshEnabled = true;
@@ -156,13 +168,17 @@
     return eventsTableHelper;
   }
 
-  const refreshTimer = setInterval(() => {
-    if (autoRefreshEnabled && !document.hidden) {
-      const helper = ensureEventsTableHelper();
-      if (helper && helper.isActive()) return;
-      window.location.reload();
-    }
-  }, 5000);
+  let lastActivity = Date.now();
+  ['mousemove','keydown','click','scroll'].forEach(ev =>
+    document.addEventListener(ev, () => lastActivity = Date.now(), { passive: true })
+  );
+  setInterval(() => {
+    if (!autoRefreshEnabled || document.hidden) return;
+    const helper = ensureEventsTableHelper();
+    if (helper && helper.isActive()) return;
+    if (Date.now() - lastActivity < 60000) return; // idle check
+    window.location.reload();
+  }, 60000);
 
   function showToast(message, type = 'info'){
     if(!toastEl) return;
