@@ -7,7 +7,7 @@
     {% if availability.configured %}
       <div class="sub mono">{{ availability.base_url }} &middot; server-side reachability checks</div>
     {% else %}
-      <div class="sub">Configure <code>HONEYPOT_PUBLIC_BASE_URL</code> to enable monitoring.</div>
+      <div class="sub">Configure <code>HONEYPOT_PUBLIC_BASE_URL</code> or <code>HONEYPOT_MONITOR_BASE_URL</code> to enable monitoring.</div>
     {% endif %}
   </div>
   {% if availability.configured %}
@@ -18,7 +18,7 @@
 {% if not availability.configured %}
   <div class="card">
     <div class="empty-state">
-      The monitor is disabled. Set <code>HONEYPOT_PUBLIC_BASE_URL</code> (reachable from the admin container) and redeploy to start collecting availability data.
+      The monitor is disabled. Set <code>HONEYPOT_PUBLIC_BASE_URL</code> or <code>HONEYPOT_MONITOR_BASE_URL</code> (reachable from the admin container) and redeploy. Compatibility: if <code>HP_ADMIN_HOST</code> is a full URL (for example, <code>http://app:8000</code>) it is also used.
     </div>
   </div>
 {% else %}

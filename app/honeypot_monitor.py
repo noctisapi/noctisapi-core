@@ -15,6 +15,7 @@ HoneypotDBFactory = Callable[[], sqlite3.Connection]
 
 HONEYPOT_PUBLIC_BASE_URL = os.getenv("HONEYPOT_PUBLIC_BASE_URL", "").strip().rstrip("/")
 HONEYPOT_MONITOR_BASE_URL = os.getenv("HONEYPOT_MONITOR_BASE_URL", "").strip().rstrip("/")
+HP_ADMIN_HOST = os.getenv("HP_ADMIN_HOST", "").strip()
 HONEYPOT_CHECK_INTERVAL = max(15, int(os.getenv("HONEYPOT_CHECK_INTERVAL", "60")))
 HONEYPOT_CHECK_TIMEOUT = float(os.getenv("HONEYPOT_CHECK_TIMEOUT", "5"))
 HONEYPOT_CHECK_RETENTION_SECONDS = int(os.getenv("HONEYPOT_CHECK_RETENTION_SECONDS", str(7 * 24 * 3600)))
@@ -33,6 +34,15 @@ def _sanitize_base(base: str) -> str:
     if base.endswith("/"):
         base = base[:-1]
     return base
+
+
+def _monitor_base_from_admin_host(value: str) -> str:
+    raw = (value or "").strip()
+    # Compatibility mode: if HP_ADMIN_HOST is an internal URL (e.g. http://app:8000),
+    # use it as monitor base. Host-only values (e.g. admin.example.com) are ignored.
+    if raw.startswith("http://") or raw.startswith("https://"):
+        return _sanitize_base(raw)
+    return ""
 
 
 def _normalize_endpoint(endpoint: str) -> str:
@@ -271,7 +281,9 @@ def _render_query(query: Optional[str], ctx: Dict[str, Any]) -> Dict[str, str]:
 class HoneypotAvailabilityMonitor:
     def __init__(self, db_factory: HoneypotDBFactory, base_url: Optional[str] = None, endpoints: Optional[List[str]] = None, checks: Optional[List[Dict[str, Any]]] = None) -> None:
         self.db_factory = db_factory
-        chosen = base_url if base_url is not None else (HONEYPOT_MONITOR_BASE_URL or HONEYPOT_PUBLIC_BASE_URL)
+        chosen = base_url if base_url is not None else (
+            HONEYPOT_MONITOR_BASE_URL or HONEYPOT_PUBLIC_BASE_URL or _monitor_base_from_admin_host(HP_ADMIN_HOST)
+        )
         self.base_url = _sanitize_base(chosen)
         self.public_base_url = _sanitize_base(HONEYPOT_PUBLIC_BASE_URL)
         self.checks = checks or DEFAULT_CHECKS
@@ -313,7 +325,9 @@ class HoneypotAvailabilityMonitor:
 
     def run_check(self, endpoint: Optional[str] = None) -> List[Dict[str, Any]] | Dict[str, Any]:
         if not self.configured:
-            raise RuntimeError("HONEYPOT_MONITOR_BASE_URL/HONEYPOT_PUBLIC_BASE_URL are not configured")
+            raise RuntimeError(
+                "HONEYPOT_MONITOR_BASE_URL/HONEYPOT_PUBLIC_BASE_URL are not configured"
+            )
 
         ssl_ctx = get_ssl_context()
         with httpx.Client(
