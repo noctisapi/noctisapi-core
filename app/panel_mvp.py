@@ -391,18 +391,6 @@ def dashboard_overview(request: Request):
         cur.execute("SELECT COUNT(*) AS cnt FROM events")
         events_total = int(cur.fetchone()["cnt"] or 0)
 
-        cases_open = 0
-        if has_cases:
-            cur.execute("SELECT COUNT(*) AS cnt FROM cases WHERE status='open'")
-            cases_open = int(cur.fetchone()["cnt"] or 0)
-
-        campaigns_active = 0
-        if has_campaigns:
-            cur.execute(
-                "SELECT COUNT(*) AS cnt FROM campaigns WHERE COALESCE(last_seen_at, created_at) >= datetime('now','-7 day')"
-            )
-            campaigns_active = int(cur.fetchone()["cnt"] or 0)
-
         stage_max = 0
         if has_sessions:
             cur.execute("SELECT COALESCE(MAX(stage_max), 0) AS max_stage FROM sessions")
@@ -455,28 +443,6 @@ def dashboard_overview(request: Request):
             )
             stage_progress = [dict(r) for r in cur.fetchall()]
 
-        cases_recent = []
-        if has_cases:
-            cur.execute(
-                "SELECT id, title, status, severity, created_at FROM cases ORDER BY created_at DESC LIMIT 5"
-            )
-            cases_recent = [dict(r) for r in cur.fetchall()]
-
-        campaigns_reactivated = []
-        if has_campaigns:
-            cur.execute(
-                """
-                SELECT campaign_id, label, last_seen_at, COALESCE(first_seen_at, created_at) AS first_seen
-                FROM campaigns
-                WHERE last_seen_at IS NOT NULL
-                  AND last_seen_at >= datetime('now','-1 day')
-                  AND COALESCE(first_seen_at, created_at) < datetime(last_seen_at,'-1 day')
-                ORDER BY last_seen_at DESC
-                LIMIT 5
-                """
-            )
-            campaigns_reactivated = [dict(r) for r in cur.fetchall()]
-
         fast_escalations = []
         if has_sessions:
             cur.execute(
@@ -501,16 +467,12 @@ def dashboard_overview(request: Request):
                     "active_24h": active_24h,
                     "active_7d": active_7d,
                     "events_total": events_total,
-                    "cases_open": cases_open,
-                    "campaigns_active": campaigns_active,
                     "stage_max": stage_max,
                 },
                 "events_by_day": events_by_day,
                 "actors_new": actors_new,
                 "actors_recurrent": actors_recurrent,
                 "stage_progress": stage_progress,
-                "cases_recent": cases_recent,
-                "campaigns_reactivated": campaigns_reactivated,
                 "fast_escalations": fast_escalations,
                 **_license_context(),
             },

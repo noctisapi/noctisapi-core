@@ -21,14 +21,6 @@
     <div class="kpi-value">{{ kpi.events_total }}</div>
   </div>
   <div class="kpi-card">
-    <div class="kpi-label">Open cases</div>
-    <div class="kpi-value">{{ kpi.cases_open }}</div>
-  </div>
-  <div class="kpi-card">
-    <div class="kpi-label">Active campaigns</div>
-    <div class="kpi-value">{{ kpi.campaigns_active }}</div>
-  </div>
-  <div class="kpi-card">
     <div class="kpi-label">Max stage reached</div>
     <div class="kpi-value">S{{ kpi.stage_max }}</div>
   </div>
@@ -62,38 +54,6 @@
   <div class="card panel-narrow">
     <div class="card-head"><div class="card-title">Recent Activity</div></div>
     <div class="card-body">
-      <div class="activity-block">
-        <div class="activity-title">Latest cases</div>
-        {% if cases_recent %}
-          <ul class="activity-list">
-            {% for c in cases_recent %}
-              <li>
-                <a class="link" href="/dashboard/cases/{{ c.id }}">#{{ c.id }}</a>
-                <span class="badge status-{{ c.status }}">{{ c.status }}</span>
-                <span class="muted" data-rel="{{ c.created_at }}">{{ c.created_at }}</span>
-              </li>
-            {% endfor %}
-          </ul>
-        {% else %}
-          <div class="muted">No cases yet.</div>
-        {% endif %}
-      </div>
-      <div class="activity-block">
-        <div class="activity-title">Reactivated campaigns (24h)</div>
-        {% if campaigns_reactivated %}
-          <ul class="activity-list">
-            {% for c in campaigns_reactivated %}
-              <li>
-                <a class="link" href="/dashboard/campaigns/{{ c.campaign_id }}">{{ c.campaign_id[:8] }}</a>
-                <span class="badge badge-accent">reactivated</span>
-                <span class="muted" data-rel="{{ c.last_seen_at }}">{{ c.last_seen_at }}</span>
-              </li>
-            {% endfor %}
-          </ul>
-        {% else %}
-          <div class="muted">No reactivations detected.</div>
-        {% endif %}
-      </div>
       <div class="activity-block">
         <div class="activity-title">Fast escalations</div>
         {% if fast_escalations %}
