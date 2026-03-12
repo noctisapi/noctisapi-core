@@ -60,7 +60,7 @@
           <tr>
             <th data-type="text">Token</th>
             <th data-type="number">Stage</th>
-            <th data-type="text">Type</th>
+            <th data-type="select" data-options='["standard","login","mfa"]'>Type</th>
             <th data-type="date">Created</th>
             <th data-type="number">Used</th>
             <th data-type="date">Last Used</th>
@@ -97,36 +97,15 @@
         <thead>
           <tr class="header">
             <th data-type="date">Timestamp</th>
-            <th data-type="text">Icon</th>
-            <th data-type="text">Kind</th>
-            <th data-type="text">Method</th>
+            <th data-type="none">Icon</th>
+            <th data-type="select" data-options='["recon_swagger","recon_env","recon_config","recon_security","auth_login","auth_mfa","auth_forgot","auth_reset","auth_me","auth_sessions","auth_apikey","admin_home","admin_users","admin_audit","internal_access","internal_reload","internal_migrate","devops_webhook","devops_build","devops_pipeline","devops_artifact","business_users","business_accounts","business_transactions","business_payments","business_reports","console_exec","console_upload","console_history","root_shell","files_upload","files_lookup","files_meta","files_analysis","files_download","pipeline_job","upload_trap"]'>Kind</th>
+            <th data-type="select" data-options='["GET","POST","PUT","DELETE","PATCH","HEAD","OPTIONS","CONNECT","TRACE"]'>Method</th>
             <th data-type="text">Path</th>
             <th data-type="text">IP</th>
+            <th data-type="text">UA</th>
+            <th data-type="number">Status</th>
             <th data-type="text">Token</th>
             <th data-type="text">Body</th>
-          </tr>
-          <tr class="table-filters">
-            <th><input class="table-filter" data-col="0" placeholder="Filter timestamp" aria-label="Filter timestamp"></th>
-            <th><input class="table-filter" data-col="1" placeholder="Filter icon" aria-label="Filter icon"></th>
-            <th><input class="table-filter" data-col="2" placeholder="Filter kind" aria-label="Filter kind"></th>
-            <th>
-              <select class="table-filter" data-col="3" aria-label="Filter method">
-                <option value="">All</option>
-                <option>GET</option>
-                <option>POST</option>
-                <option>PUT</option>
-                <option>DELETE</option>
-                <option>PATCH</option>
-                <option>HEAD</option>
-                <option>OPTIONS</option>
-                <option>CONNECT</option>
-                <option>TRACE</option>
-              </select>
-            </th>
-            <th><input class="table-filter" data-col="4" placeholder="Filter path" aria-label="Filter path"></th>
-            <th><input class="table-filter" data-col="5" placeholder="Filter IP" aria-label="Filter IP"></th>
-            <th><input class="table-filter" data-col="6" placeholder="Filter token" aria-label="Filter token"></th>
-            <th><input class="table-filter" data-col="7" placeholder="Filter body" aria-label="Filter body"></th>
           </tr>
         </thead>
         <tbody>
@@ -141,6 +120,8 @@
               {% if e.geo_flag %}{{ e.geo_flag }} {% endif %}
               {{ e.ip or '-' }}
             </td>
+            <td class="mono clip" title="{{ e.ua or '' }}">{{ e.ua or '-' }}</td>
+            <td class="mono" style="{% if e.status and e.status < 400 %}color:#7ee2b8{% elif e.status and e.status < 500 %}color:#ffc940{% elif e.status %}color:#f2a6a6{% endif %}">{{ e.status or '-' }}</td>
             <td class="mono" title="{{ e.token }}">{{ e.token if e.token else '-' }}</td>
             <td class="mono" title="{{ e.body_sample }}">{{ e.body_sample if e.body_sample else '-' }}</td>
           </tr>
