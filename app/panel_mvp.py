@@ -15,16 +15,24 @@ from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 from typing import Optional
 
+import urllib.request
+
 from app import status_checks
 from app import licensing
+from app import api_modular
 from app.honeypot_monitor import HoneypotAvailabilityMonitor, get_history as hp_get_history, get_summary as hp_get_summary
 from app.server_config import RequestTimeoutMiddleware, get_request_timeout
+from app.tls_config import get_ssl_context
 
 _logger = logging.getLogger(__name__)
 
 APP_NAME = "noctisapi-panel"
 DB_PATH = os.getenv("HP_DB_PATH", "/data/honeypot.db")
 HP_GEOIP_DB = os.getenv("HP_GEOIP_DB", "/data/GeoLite2-Country.mmdb")
+HP_PUBLIC_BASE_URL = (os.getenv("HP_PUBLIC_BASE_URL") or "").strip().rstrip("/")
+_HP_MONITOR_SECRET = os.getenv("HP_MONITOR_SECRET", "").strip()
+API_CATALOG_LOCK = threading.Lock()
+API_CATALOG_CACHE: dict = {"ts": 0, "catalog": [], "source": "none", "error": ""}
 
 app = FastAPI(title=APP_NAME)
 app.add_middleware(RequestTimeoutMiddleware, timeout=get_request_timeout())
@@ -368,6 +376,261 @@ def _table_exists(cur: sqlite3.Cursor, table_name: str) -> bool:
         (table_name,),
     )
     return cur.fetchone() is not None
+
+
+def _normalize_catalog_method(method: str) -> str:
+    raw = str(method or "*").strip().upper()
+    return raw or "*"
+
+
+def _normalize_catalog_path(path: str) -> str:
+    raw = str(path or "").strip()
+    if not raw:
+        return "/"
+    if not raw.startswith("/"):
+        return "/" + raw
+    return raw
+
+
+def _honeypot_public_endpoint_catalog() -> tuple:
+    now = int(time.time())
+    with API_CATALOG_LOCK:
+        ts = int(API_CATALOG_CACHE.get("ts") or 0)
+        cached = API_CATALOG_CACHE.get("catalog")
+        if ts > 0 and (now - ts) < 60 and isinstance(cached, list):
+            source = str(API_CATALOG_CACHE.get("source") or "cache")
+            err = str(API_CATALOG_CACHE.get("error") or "")
+            return list(cached), source, err
+
+    def _catalog_from_openapi_doc(doc: dict) -> list:
+        paths = doc.get("paths") if isinstance(doc, dict) else {}
+        if not isinstance(paths, dict):
+            return []
+        seen: set = set()
+        out: list = []
+        for path, path_item in paths.items():
+            pp = _normalize_catalog_path(path)
+            if not isinstance(path_item, dict):
+                continue
+            for method in sorted(path_item.keys()):
+                mm = _normalize_catalog_method(method)
+                if mm in {"HEAD", "OPTIONS", "TRACE"}:
+                    continue
+                key = f"{mm} {pp}"
+                if key in seen:
+                    continue
+                seen.add(key)
+                out.append({"method": mm, "path": pp, "label": key})
+        out.sort(key=lambda item: (item.get("path") or "", item.get("method") or ""))
+        return out
+
+    source = "none"
+    last_error = ""
+    if HP_PUBLIC_BASE_URL:
+        url = f"{HP_PUBLIC_BASE_URL}/openapi.json"
+        try:
+            _fetch_headers: dict = {"accept": "application/json"}
+            if _HP_MONITOR_SECRET:
+                _fetch_headers["x-internal-monitor"] = _HP_MONITOR_SECRET
+            req = urllib.request.Request(url, headers=_fetch_headers)
+            with urllib.request.urlopen(req, timeout=3.0, context=get_ssl_context()) as resp:
+                raw = resp.read()
+            parsed = json.loads(raw.decode("utf-8", errors="ignore") or "{}")
+            remote_catalog = _catalog_from_openapi_doc(parsed)
+            if remote_catalog:
+                with API_CATALOG_LOCK:
+                    API_CATALOG_CACHE["ts"] = now
+                    API_CATALOG_CACHE["catalog"] = list(remote_catalog)
+                    API_CATALOG_CACHE["source"] = "remote_openapi"
+                    API_CATALOG_CACHE["error"] = ""
+                return remote_catalog, "remote_openapi", ""
+        except Exception as exc:
+            last_error = f"remote_openapi_failed:{exc.__class__.__name__}"
+            source = "remote_openapi_failed"
+
+    try:
+        from app.honeypot_public import app as public_api
+        local_doc = public_api.openapi()
+        local_catalog = _catalog_from_openapi_doc(local_doc if isinstance(local_doc, dict) else {})
+        if local_catalog:
+            with API_CATALOG_LOCK:
+                API_CATALOG_CACHE["ts"] = now
+                API_CATALOG_CACHE["catalog"] = list(local_catalog)
+                API_CATALOG_CACHE["source"] = "local_openapi"
+                API_CATALOG_CACHE["error"] = last_error
+            return local_catalog, "local_openapi", last_error
+    except Exception:
+        if not last_error:
+            last_error = "local_openapi_failed"
+    with API_CATALOG_LOCK:
+        API_CATALOG_CACHE["ts"] = now
+        API_CATALOG_CACHE["catalog"] = []
+        API_CATALOG_CACHE["source"] = source or "none"
+        API_CATALOG_CACHE["error"] = last_error
+    return [], (source or "none"), last_error
+
+
+def _is_real_honeypot_endpoint(path: str, method: str, catalog: list) -> bool:
+    target_path = _normalize_catalog_path(path)
+    target_method = _normalize_catalog_method(method)
+    for item in catalog:
+        item_method = _normalize_catalog_method(item.get("method") or "*")
+        item_path = _normalize_catalog_path(item.get("path") or "/")
+        if target_method != "*" and item_method != target_method:
+            continue
+        if api_modular.path_matches_pattern(item_path, target_path):
+            return True
+    return False
+
+
+def _api_modular_endpoint_catalog(conn: sqlite3.Connection, limit: int = 400) -> list:
+    _ = conn
+    _ = limit
+    catalog, _source, _err = _honeypot_public_endpoint_catalog()
+    return catalog
+
+
+@app.get("/dashboard/api-modular", response_class=HTMLResponse)
+def dashboard_api_modular(request: Request):
+    return templates.TemplateResponse(
+        "api_modular.html",
+        {
+            "request": request,
+            **_license_context(),
+        },
+    )
+
+
+@app.get("/dashboard/api-modular/state", response_class=JSONResponse)
+def dashboard_api_modular_state():
+    conn = db()
+    try:
+        ensure_schema(conn)
+        api_modular.ensure_tables(conn)
+        configs = api_modular.list_endpoint_configs(conn)
+        endpoint_catalog = _api_modular_endpoint_catalog(conn, limit=600)
+        _cat, catalog_source, catalog_error = _honeypot_public_endpoint_catalog()
+    finally:
+        conn.close()
+    return {
+        "templates": api_modular.list_templates(),
+        "endpoint_configs": configs,
+        "endpoint_catalog": endpoint_catalog,
+        "endpoint_catalog_source": catalog_source,
+        "endpoint_catalog_error": catalog_error,
+    }
+
+
+@app.post("/dashboard/api-modular/config", response_class=JSONResponse)
+def dashboard_api_modular_save_config(payload: dict = Body(default={})):
+    if not isinstance(payload, dict):
+        raise HTTPException(status_code=400, detail="invalid_payload")
+    path = str(payload.get("path") or "").strip()
+    if not path:
+        raise HTTPException(status_code=400, detail="path_required")
+    method = str(payload.get("method") or "*").strip().upper() or "*"
+    config_raw = payload.get("config")
+    if not isinstance(config_raw, dict):
+        raise HTTPException(status_code=400, detail="config_required")
+    conn = db()
+    try:
+        ensure_schema(conn)
+        api_modular.ensure_tables(conn)
+        route_catalog, _catalog_source, _catalog_error = _honeypot_public_endpoint_catalog()
+        if not _is_real_honeypot_endpoint(path, method, route_catalog):
+            raise HTTPException(status_code=400, detail="unknown_honeypot_endpoint")
+        saved = api_modular.upsert_endpoint_config(conn, path=path, method=method, config=config_raw)
+    finally:
+        conn.close()
+    return {"saved": True, "entry": saved}
+
+
+@app.post("/dashboard/api-modular/config/delete", response_class=JSONResponse)
+def dashboard_api_modular_delete_config(payload: dict = Body(default={})):
+    if not isinstance(payload, dict):
+        raise HTTPException(status_code=400, detail="invalid_payload")
+    path = str(payload.get("path") or "").strip()
+    method = str(payload.get("method") or "*").strip().upper() or "*"
+    if not path:
+        raise HTTPException(status_code=400, detail="path_required")
+    conn = db()
+    try:
+        ensure_schema(conn)
+        api_modular.ensure_tables(conn)
+        deleted = api_modular.delete_endpoint_config(conn, path=path, method=method)
+    finally:
+        conn.close()
+    return {"deleted": bool(deleted)}
+
+
+@app.post("/dashboard/api-modular/template/apply", response_class=JSONResponse)
+def dashboard_api_modular_apply_template(payload: dict = Body(default={})):
+    if not isinstance(payload, dict):
+        raise HTTPException(status_code=400, detail="invalid_payload")
+    template_name = str(payload.get("template_name") or "").strip().lower()
+    path = str(payload.get("path") or "").strip()
+    method = str(payload.get("method") or "*").strip().upper() or "*"
+    if not template_name:
+        raise HTTPException(status_code=400, detail="template_name_required")
+    if not path:
+        raise HTTPException(status_code=400, detail="path_required")
+    conn = db()
+    try:
+        ensure_schema(conn)
+        api_modular.ensure_tables(conn)
+        route_catalog, _catalog_source, _catalog_error = _honeypot_public_endpoint_catalog()
+        if not _is_real_honeypot_endpoint(path, method, route_catalog):
+            raise HTTPException(status_code=400, detail="unknown_honeypot_endpoint")
+        try:
+            saved = api_modular.apply_template(conn, template_name=template_name, path=path, method=method)
+        except ValueError as exc:
+            raise HTTPException(status_code=400, detail=str(exc))
+    finally:
+        conn.close()
+    return {"saved": True, "entry": saved}
+
+
+@app.get("/dashboard/api-modular/analytics", response_class=JSONResponse)
+def dashboard_api_modular_analytics(hours: int = 24):
+    window_hours = max(1, min(int(hours), 168))
+    conn = db()
+    try:
+        ensure_schema(conn)
+        api_modular.ensure_tables(conn)
+        endpoints = api_modular.analytics_endpoint_metrics(conn, window_hours=window_hours, limit=20)
+        interest = api_modular.analytics_interest_scoring(conn, window_hours=window_hours, limit=20)
+        fingerprinting = api_modular.analytics_fingerprinting(conn, window_hours=window_hours, limit=20)
+    finally:
+        conn.close()
+    return {
+        "window_hours": window_hours,
+        "endpoints": endpoints,
+        "interest": interest,
+        "fingerprinting": fingerprinting,
+    }
+
+
+@app.get("/dashboard/api-modular/resolve", response_class=JSONResponse)
+def dashboard_api_modular_resolve(path: str = "/", method: str = "GET"):
+    conn = db()
+    try:
+        ensure_schema(conn)
+        api_modular.ensure_tables(conn)
+        resolved = api_modular.resolve_endpoint_config(
+            conn,
+            path=path,
+            method=method,
+            ensure_schema=False,
+        )
+        return {
+            "path": str(path or "/"),
+            "method": str(method or "GET").upper(),
+            "resolved": resolved,
+        }
+    except Exception as exc:
+        raise HTTPException(status_code=500, detail=str(exc)[:200])
+    finally:
+        conn.close()
 
 
 @app.get("/", response_class=HTMLResponse)
