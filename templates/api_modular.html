@@ -1,0 +1,571 @@
+{% extends "base.html" %}
+{% block content %}
+<div class="page-head">
+  <div>
+    <h1>API Modular</h1>
+    <div class="sub">Controls endpoint behaviour. Endpoint configs, analytics, and resolve tool.</div>
+  </div>
+  <div id="tierSummary" class="muted tiny-text"></div>
+</div>
+
+<section class="card" style="margin-bottom:14px;">
+  <div class="card-body">
+    <div id="featureStatus" class="tiny-text muted"></div>
+  </div>
+</section>
+
+<!-- Core: Endpoint Config + Current Configs -->
+<section class="section-grid" style="grid-template-columns: 1.15fr 1fr;">
+  <div class="card">
+    <div class="card-head">
+      <div class="card-title">Core Endpoint Config</div>
+      <div class="card-subtitle">Override behaviour for a specific endpoint.</div>
+    </div>
+    <div class="card-body">
+      <div class="modal-form">
+        <label for="cfgPathSelect">Endpoint</label>
+        <select id="cfgPathSelect" class="input">
+          <option value="">— select an endpoint —</option>
+        </select>
+
+        <label for="cfgEnabled">enabled</label>
+        <select id="cfgEnabled" class="input">
+          <option value="true">true — respond normally</option>
+          <option value="false">false — return 404</option>
+        </select>
+
+        <label for="cfgMode">response_mode</label>
+        <select id="cfgMode" class="input">
+          <option value="normal">normal — realistic full response</option>
+          <option value="minimal">minimal — stripped-down response</option>
+          <option value="error_bias">error_bias — prefer 4xx/5xx responses</option>
+        </select>
+
+        <label for="cfgFixedStatus">fixed_status <span style="font-weight:400; color:var(--text-muted,#888);">(optional override)</span></label>
+        <input id="cfgFixedStatus" class="input" type="number" min="100" max="599" placeholder="empty = no override" />
+
+        <label for="cfgRichness">richness_level <span style="font-weight:400; color:var(--text-muted,#888);">(0 = minimal · 2 = full)</span></label>
+        <input id="cfgRichness" class="input" type="number" min="0" max="2" value="2" />
+      </div>
+      <div class="modal-actions">
+        <button class="btn btn-primary" type="button" onclick="saveEndpointConfig()">Save Config</button>
+        <button class="btn btn-outline" type="button" onclick="resetConfigForm()">Clear</button>
+      </div>
+      <div id="cfgStatus" class="modal-hint"></div>
+
+      <hr style="border-color:var(--stroke); border-width:1px 0 0; margin:16px 0;" />
+
+      <!-- Apply Template sub-section -->
+      <div style="font-weight:600; font-size:0.85rem; margin-bottom:8px;">Apply Core Template</div>
+      <div class="modal-form">
+        <label for="tplName">Template</label>
+        <select id="tplName" class="input"></select>
+
+        <label for="tplPathSelect">Endpoint</label>
+        <select id="tplPathSelect" class="input">
+          <option value="">— select an endpoint —</option>
+        </select>
+      </div>
+      <div class="modal-actions">
+        <button class="btn btn-outline" type="button" onclick="applyTemplate()">Apply Template</button>
+      </div>
+    </div>
+  </div>
+
+  <div class="card">
+    <div class="card-head">
+      <div class="card-title">Current Configs</div>
+      <div class="card-subtitle">Custom overrides active on the honeypot.</div>
+    </div>
+    <div class="card-body">
+      <div id="endpointConfigs" class="muted">Loading...</div>
+    </div>
+  </div>
+</section>
+
+<!-- Analytics -->
+<section class="card">
+  <div class="card-head">
+    <div class="card-title">Analytics</div>
+    <div class="card-subtitle">Endpoint hit patterns, interest scores, and actor fingerprinting.</div>
+  </div>
+  <div class="card-body">
+    <div style="display:flex; align-items:center; gap:10px; margin-bottom:12px;">
+      <label for="analyticsHours" style="margin:0; font-size:0.82rem;">Window:</label>
+      <select id="analyticsHours" class="input" style="width:auto;">
+        <option value="1">Last 1 h</option>
+        <option value="6">Last 6 h</option>
+        <option value="24" selected>Last 24 h</option>
+        <option value="72">Last 72 h</option>
+        <option value="168">Last 7 days</option>
+      </select>
+      <button class="btn btn-outline" type="button" onclick="loadAnalytics()">Refresh</button>
+    </div>
+    <div id="analyticsStatus" class="modal-hint" style="margin-bottom:8px;"></div>
+    <div id="analyticsContent"></div>
+  </div>
+</section>
+
+<!-- Resolve Tool -->
+<section class="card">
+  <div class="card-head">
+    <div class="card-title">Resolve Config</div>
+    <div class="card-subtitle">Check which config would be applied to a given request.</div>
+  </div>
+  <div class="card-body">
+    <div style="display:flex; gap:12px; align-items:flex-end; flex-wrap:wrap;">
+      <div style="flex:1; min-width:200px;">
+        <label for="resolvePath" style="font-size:0.82rem; display:block; margin-bottom:5px;">Path</label>
+        <input id="resolvePath" class="input mono" type="text" placeholder="/api/v1/users" />
+      </div>
+      <div style="width:130px;">
+        <label for="resolveMethod" style="font-size:0.82rem; display:block; margin-bottom:5px;">Method</label>
+        <select id="resolveMethod" class="input">
+          <option value="GET">GET</option>
+          <option value="POST">POST</option>
+          <option value="PUT">PUT</option>
+          <option value="DELETE">DELETE</option>
+          <option value="PATCH">PATCH</option>
+        </select>
+      </div>
+      <div style="display:flex; flex-direction:column; justify-content:flex-end;">
+        <label style="font-size:0.82rem; display:block; margin-bottom:5px; visibility:hidden;">Go</label>
+        <button class="btn btn-primary" type="button" onclick="resolveConfig()">Resolve</button>
+      </div>
+    </div>
+    <div id="resolveStatus" class="modal-hint" style="margin-top:8px;"></div>
+    <div id="resolveOutput" style="margin-top:8px;"></div>
+  </div>
+</section>
+
+<script>
+  const INITIAL_PRO_MODULAR_VISIBLE = false;
+  const INITIAL_PRO_ANALYTICS_VISIBLE = true;
+  const INITIAL_PRO_MODULAR_ENABLED = false;
+  const INITIAL_PRO_ANALYTICS_ENABLED = true;
+
+  let stateCache = null;
+
+  // ── Helpers ────────────────────────────────────────────────────────────────
+  function escapeHtml(value) {
+    return String(value == null ? "" : value)
+      .replaceAll("&", "&amp;").replaceAll("<", "&lt;")
+      .replaceAll(">", "&gt;").replaceAll("\"", "&quot;").replaceAll("'", "&#39;");
+  }
+
+  function valueOrNullInt(raw) {
+    const txt = String(raw ?? "").trim();
+    if (txt === "") return null;
+    const n = Number(txt);
+    return isNaN(n) ? null : Math.trunc(n);
+  }
+
+  // Parse a catalog dropdown value "METHOD /path" → {method, path}
+  function parseCatalogValue(val) {
+    const v = (val || "").trim();
+    const sp = v.indexOf(" ");
+    if (sp <= 0) return null;
+    return {method: v.slice(0, sp), path: v.slice(sp + 1)};
+  }
+
+  // Badge with proper rgba() background so it always shows text
+  function badge(text, r, g, b) {
+    return `<span style="display:inline-block; padding:1px 7px; border-radius:4px; font-size:0.75rem; font-weight:600; background:rgba(${r},${g},${b},0.12); color:rgb(${r},${g},${b}); border:1px solid rgba(${r},${g},${b},0.3);">${escapeHtml(text)}</span>`;
+  }
+
+  // ── Feature status bar ─────────────────────────────────────────────────────
+  function renderFeatureStatus() {
+    const summary = document.getElementById("tierSummary");
+    const detail = document.getElementById("featureStatus");
+    const state = stateCache || {};
+    const catalogSource = String(state.endpoint_catalog_source || "unknown");
+    const catalogError = String(state.endpoint_catalog_error || "");
+    if (summary) {
+      summary.textContent = `catalog: ${catalogSource}`;
+    }
+    if (detail) {
+      detail.textContent = catalogError
+        ? `Core is always available. Catalog error: ${catalogError}`
+        : "Core is always available.";
+    }
+  }
+
+  // ── Catalog dropdowns ──────────────────────────────────────────────────────
+  function renderEndpointCatalog() {
+    const catalog = (stateCache && Array.isArray(stateCache.endpoint_catalog)) ? stateCache.endpoint_catalog : [];
+    const ids = ["cfgPathSelect", "tplPathSelect"];
+    ids.forEach((id) => {
+      const sel = document.getElementById(id);
+      if (!sel) return;
+      const current = sel.value;
+      sel.innerHTML = '<option value="">— select an endpoint —</option>';
+      catalog.forEach((item) => {
+        const method = String(item.method || "*").trim().toUpperCase() || "*";
+        const path = String(item.path || "/").trim() || "/";
+        const opt = document.createElement("option");
+        opt.value = `${method} ${path}`;
+        opt.textContent = `${method}  ${path}`;
+        sel.appendChild(opt);
+      });
+      if (current) sel.value = current;
+    });
+  }
+
+  // ── Templates dropdown ─────────────────────────────────────────────────────
+  const TEMPLATE_DESCRIPTIONS = {
+    balanced:   "balanced — realistic full response (normal, richness 2)",
+    minimal:    "minimal — stripped-down response (minimal, richness 0)",
+    error_trap: "error_trap — prefer error responses (error_bias, richness 1)",
+    disabled:   "disabled — block with 404",
+  };
+
+  function renderTemplates() {
+    const sel = document.getElementById("tplName");
+    if (!sel) return;
+    sel.innerHTML = "";
+    const templates = (stateCache && stateCache.templates) ? stateCache.templates : {};
+    Object.keys(templates).forEach((name) => {
+      const opt = document.createElement("option");
+      opt.value = name;
+      opt.textContent = TEMPLATE_DESCRIPTIONS[name] || name;
+      sel.appendChild(opt);
+    });
+  }
+
+  // ── Current configs list ───────────────────────────────────────────────────
+  function renderEndpointConfigs() {
+    const el = document.getElementById("endpointConfigs");
+    if (!el) return;
+    const rows = (stateCache && Array.isArray(stateCache.endpoint_configs)) ? stateCache.endpoint_configs : [];
+    if (!rows.length) {
+      el.innerHTML = '<div style="color:var(--text-muted,#666);">No custom endpoint configs. Default behaviour is active for all endpoints.</div>';
+      return;
+    }
+    const html = rows.map((item) => {
+      const cfg = item.config || {};
+      const safeMethod = encodeURIComponent(item.method || "*");
+      const safePath = encodeURIComponent(item.path || "/");
+      const safeCfg = encodeURIComponent(JSON.stringify(cfg || {}));
+      const enabledBadge = cfg.enabled
+        ? badge("enabled", 34, 160, 90)
+        : badge("disabled", 180, 50, 50);
+      const modeBadge = cfg.response_mode === "error_bias"
+        ? badge("error_bias", 200, 60, 60)
+        : cfg.response_mode === "minimal"
+          ? badge("minimal", 100, 100, 120)
+          : badge("normal", 60, 130, 160);
+      const statusBadge = cfg.fixed_status != null ? badge("→" + cfg.fixed_status, 200, 120, 30) : "";
+      const richBadge = badge("richness " + (cfg.richness_level ?? 2), 90, 90, 110);
+      return `
+        <div style="border:1px solid var(--stroke); border-radius:6px; padding:10px 12px; margin-bottom:8px;">
+          <div class="mono" style="font-size:0.9rem; font-weight:600;">${escapeHtml(item.method)} ${escapeHtml(item.path)}</div>
+          <div style="margin:5px 0; display:flex; gap:5px; flex-wrap:wrap;">
+            ${enabledBadge} ${modeBadge} ${statusBadge} ${richBadge}
+          </div>
+          <div style="font-size:0.75rem; color:var(--text-muted,#888);">${escapeHtml(item.updated_ts || "")}</div>
+          <div class="modal-actions" style="margin-top:8px;">
+            <button class="btn btn-outline btn-small" type="button" onclick="loadConfigToEditor('${safeMethod}','${safePath}','${safeCfg}')">Edit</button>
+            <button class="btn btn-danger btn-small" type="button" onclick="deleteEndpointConfig('${safeMethod}','${safePath}')">Delete</button>
+          </div>
+        </div>
+      `;
+    }).join("");
+    el.innerHTML = html;
+  }
+
+  // Load an existing config into the form (selects the endpoint in the dropdown)
+  function loadConfigToEditor(methodEncoded, pathEncoded, cfgEncoded) {
+    const method = decodeURIComponent(methodEncoded || "");
+    const path = decodeURIComponent(pathEncoded || "");
+    let cfg = {};
+    try { cfg = JSON.parse(decodeURIComponent(cfgEncoded || "")); } catch (_e) {}
+
+    const pathSel = document.getElementById("cfgPathSelect");
+    if (pathSel) {
+      const target = `${method} ${path}`;
+      const found = Array.from(pathSel.options).some(o => o.value === target);
+      if (found) pathSel.value = target;
+    }
+
+    const enabledSel = document.getElementById("cfgEnabled");
+    const modeSel = document.getElementById("cfgMode");
+    const fixedInput = document.getElementById("cfgFixedStatus");
+    const richInput = document.getElementById("cfgRichness");
+    if (enabledSel) enabledSel.value = cfg.enabled ? "true" : "false";
+    if (modeSel && cfg.response_mode) modeSel.value = cfg.response_mode;
+    if (fixedInput) fixedInput.value = cfg.fixed_status == null ? "" : String(cfg.fixed_status);
+    if (richInput) richInput.value = cfg.richness_level == null ? "2" : String(cfg.richness_level);
+
+    const statusEl = document.getElementById("cfgStatus");
+    if (statusEl) statusEl.textContent = `Loaded ${method} ${path} — adjust and save.`;
+
+    window.scrollTo({top: 0, behavior: "smooth"});
+  }
+
+  function resetConfigForm() {
+    const pathSel = document.getElementById("cfgPathSelect");
+    const enabledSel = document.getElementById("cfgEnabled");
+    const modeSel = document.getElementById("cfgMode");
+    const fixedInput = document.getElementById("cfgFixedStatus");
+    const richInput = document.getElementById("cfgRichness");
+    if (pathSel) pathSel.value = "";
+    if (enabledSel) enabledSel.value = "true";
+    if (modeSel) modeSel.value = "normal";
+    if (fixedInput) fixedInput.value = "";
+    if (richInput) richInput.value = "2";
+    const statusEl = document.getElementById("cfgStatus");
+    if (statusEl) statusEl.textContent = "";
+  }
+
+  // ── Analytics tables ───────────────────────────────────────────────────────
+  function renderAnalytics(data) {
+    const el = document.getElementById("analyticsContent");
+    if (!el) return;
+    if (!data || typeof data !== "object") {
+      el.innerHTML = '<div style="color:var(--text-muted,#666);">No data.</div>';
+      return;
+    }
+
+    function makeTable(title, rows, cols) {
+      if (!rows || !rows.length) {
+        return `<div style="margin-bottom:16px;"><b>${escapeHtml(title)}</b> <span style="color:var(--text-muted,#888); font-size:0.8rem;">(no data)</span></div>`;
+      }
+      const thStyle = "text-align:left; padding:5px 10px; border-bottom:2px solid var(--stroke); font-size:0.8rem; white-space:nowrap; color:var(--text,#222);";
+      const tdStyle = "padding:4px 10px; border-bottom:1px solid var(--stroke); font-size:0.81rem; color:var(--text,#222); white-space:nowrap;";
+      const head = cols.map(c => `<th style="${thStyle}">${escapeHtml(c.label)}</th>`).join("");
+      const body = rows.map(row => {
+        const cells = cols.map(c => {
+          let val = row[c.key];
+          if (val == null) val = "—";
+          else if (c.format) val = c.format(val, row);
+          return `<td style="${tdStyle}${c.mono ? " font-family:monospace;" : ""}">${escapeHtml(String(val))}</td>`;
+        }).join("");
+        return `<tr>${cells}</tr>`;
+      }).join("");
+      return `<div style="margin-bottom:20px;">
+        <div style="font-weight:600; font-size:0.85rem; margin-bottom:6px; color:var(--text,#222);">${escapeHtml(title)}</div>
+        <div style="overflow-x:auto; border:1px solid var(--stroke); border-radius:6px;">
+          <table style="width:100%; border-collapse:collapse;">
+            <thead><tr>${head}</tr></thead>
+            <tbody>${body}</tbody>
+          </table>
+        </div>
+      </div>`;
+    }
+
+    const pct = v => v != null ? (Number(v) * 100).toFixed(1) + "%" : "—";
+    const ms  = v => v != null ? Number(v).toFixed(0) + " ms" : "—";
+    const f2  = v => v != null ? Number(v).toFixed(2) : "—";
+
+    el.innerHTML =
+      `<div style="font-size:0.8rem; color:var(--text-muted,#888); margin-bottom:12px;">Window: last ${escapeHtml(data.window_hours)} h</div>` +
+      makeTable("Endpoint Metrics", data.endpoints || [], [
+        {key: "method",        label: "Method"},
+        {key: "path",          label: "Path", mono: true},
+        {key: "hits",          label: "Hits"},
+        {key: "errors",        label: "Errors"},
+        {key: "error_rate",    label: "Error %", format: pct},
+        {key: "avg_status",    label: "Avg Status"},
+        {key: "avg_latency_ms",label: "Avg Latency", format: ms},
+      ]) +
+      makeTable("Interest Scoring — suspicious endpoints", data.interest || [], [
+        {key: "path",          label: "Path", mono: true},
+        {key: "interest_score",label: "Score", format: f2},
+        {key: "hits",          label: "Hits"},
+        {key: "unique_actors", label: "Actors"},
+        {key: "errors",        label: "Errors"},
+        {key: "error_rate",    label: "Error %", format: pct},
+      ]) +
+      makeTable("Actor Fingerprinting — by IP", data.fingerprinting || [], [
+        {key: "ip",                  label: "IP", mono: true},
+        {key: "fingerprint_score",   label: "Score", format: f2},
+        {key: "hits",                label: "Hits"},
+        {key: "unique_paths",        label: "Paths"},
+        {key: "unique_user_agents",  label: "UAs"},
+        {key: "unique_actors",       label: "Actors"},
+        {key: "error_rate",          label: "Error %", format: pct},
+      ]);
+  }
+
+  // ── State load ─────────────────────────────────────────────────────────────
+  async function loadState() {
+    try {
+      const res = await fetch("/dashboard/api-modular/state");
+      const data = await res.json();
+      stateCache = data || {};
+      renderFeatureStatus();
+      renderEndpointCatalog();
+      renderTemplates();
+      renderEndpointConfigs();
+    } catch (err) {
+      const statusEl = document.getElementById("cfgStatus");
+      if (statusEl) statusEl.textContent = `Failed to load state: ${err.message || "request_failed"}`;
+    }
+  }
+
+  // ── Config save / delete ───────────────────────────────────────────────────
+  async function saveEndpointConfig() {
+    const statusEl = document.getElementById("cfgStatus");
+    const catalogVal = (document.getElementById("cfgPathSelect") || {}).value || "";
+    const ep = parseCatalogValue(catalogVal);
+    if (!ep) {
+      if (statusEl) statusEl.textContent = "Select an endpoint from the catalog first.";
+      return;
+    }
+    const payload = {
+      path: ep.path,
+      method: ep.method,
+      config: {
+        enabled: ((document.getElementById("cfgEnabled") || {}).value || "true") === "true",
+        response_mode: (document.getElementById("cfgMode") || {}).value || "normal",
+        fixed_status: valueOrNullInt((document.getElementById("cfgFixedStatus") || {}).value),
+        richness_level: Number((document.getElementById("cfgRichness") || {}).value ?? 2),
+      },
+    };
+    if (statusEl) statusEl.textContent = "Saving...";
+    try {
+      const res = await fetch("/dashboard/api-modular/config", {
+        method: "POST",
+        headers: {"content-type": "application/json"},
+        body: JSON.stringify(payload),
+      });
+      const text = await res.text();
+      if (!res.ok) {
+        if (statusEl) statusEl.textContent = `Save failed: ${text}`;
+        return;
+      }
+      if (statusEl) statusEl.textContent = `Saved ${ep.method} ${ep.path}.`;
+      await loadState();
+    } catch (err) {
+      if (statusEl) statusEl.textContent = `Save failed: ${err.message || "request_failed"}`;
+    }
+  }
+
+  async function deleteEndpointConfig(methodEncoded, pathEncoded) {
+    const method = decodeURIComponent(methodEncoded || "");
+    const path = decodeURIComponent(pathEncoded || "");
+    if (!confirm(`Delete config for ${method} ${path}?`)) return;
+    const statusEl = document.getElementById("cfgStatus");
+    if (statusEl) statusEl.textContent = `Deleting ${method} ${path}...`;
+    try {
+      const res = await fetch("/dashboard/api-modular/config/delete", {
+        method: "POST",
+        headers: {"content-type": "application/json"},
+        body: JSON.stringify({method, path}),
+      });
+      const text = await res.text();
+      if (!res.ok) {
+        if (statusEl) statusEl.textContent = `Delete failed: ${text}`;
+        return;
+      }
+      if (statusEl) statusEl.textContent = "Deleted.";
+      await loadState();
+    } catch (err) {
+      if (statusEl) statusEl.textContent = `Delete failed: ${err.message || "request_failed"}`;
+    }
+  }
+
+  // ── Template apply ─────────────────────────────────────────────────────────
+  async function applyTemplate() {
+    const statusEl = document.getElementById("cfgStatus");
+    const catalogVal = (document.getElementById("tplPathSelect") || {}).value || "";
+    const ep = parseCatalogValue(catalogVal);
+    if (!ep) {
+      if (statusEl) statusEl.textContent = "Select an endpoint from the catalog first.";
+      return;
+    }
+    const payload = {
+      template_name: (document.getElementById("tplName") || {}).value || "",
+      path: ep.path,
+      method: ep.method,
+    };
+    if (!payload.template_name) {
+      if (statusEl) statusEl.textContent = "Select a template first.";
+      return;
+    }
+    if (statusEl) statusEl.textContent = "Applying template...";
+    try {
+      const res = await fetch("/dashboard/api-modular/template/apply", {
+        method: "POST",
+        headers: {"content-type": "application/json"},
+        body: JSON.stringify(payload),
+      });
+      const text = await res.text();
+      if (!res.ok) {
+        if (statusEl) statusEl.textContent = `Template failed: ${text}`;
+        return;
+      }
+      if (statusEl) statusEl.textContent = `Template '${payload.template_name}' applied to ${ep.method} ${ep.path}.`;
+      await loadState();
+    } catch (err) {
+      if (statusEl) statusEl.textContent = `Template failed: ${err.message || "request_failed"}`;
+    }
+  }
+
+  // ── Analytics ──────────────────────────────────────────────────────────────
+  async function loadAnalytics() {
+    const statusEl = document.getElementById("analyticsStatus");
+    const hoursSel = document.getElementById("analyticsHours");
+    const hours = hoursSel ? hoursSel.value : "24";
+    if (statusEl) statusEl.textContent = "Loading analytics...";
+    try {
+      const res = await fetch(`/dashboard/api-modular/analytics?hours=${hours}`);
+      const text = await res.text();
+      if (!res.ok) {
+        if (statusEl) statusEl.textContent = `Analytics failed: ${text}`;
+        return;
+      }
+      renderAnalytics(JSON.parse(text || "{}"));
+      if (statusEl) statusEl.textContent = "";
+    } catch (err) {
+      if (statusEl) statusEl.textContent = `Analytics failed: ${err.message || "request_failed"}`;
+    }
+  }
+
+  // ── Resolve config ─────────────────────────────────────────────────────────
+  async function resolveConfig() {
+    const statusEl = document.getElementById("resolveStatus");
+    const outputEl = document.getElementById("resolveOutput");
+    const path   = (document.getElementById("resolvePath")   || {}).value || "/";
+    const method = (document.getElementById("resolveMethod") || {}).value || "GET";
+    if (statusEl) statusEl.textContent = "Resolving...";
+    if (outputEl) outputEl.innerHTML = "";
+    try {
+      const res = await fetch(`/dashboard/api-modular/resolve?path=${encodeURIComponent(path)}&method=${encodeURIComponent(method)}`);
+      const text = await res.text();
+      if (!res.ok) {
+        if (statusEl) statusEl.textContent = `Resolve failed: ${text}`;
+        return;
+      }
+      const data = JSON.parse(text || "{}");
+      const r   = data.resolved || {};
+      const cfg = r.config || {};
+      if (statusEl) statusEl.textContent = "";
+      if (outputEl) {
+        const rows = [
+          ["match_type",    escapeHtml(r.match_type || "default")],
+          ["enabled",       escapeHtml(cfg.enabled)],
+          ["response_mode", escapeHtml(cfg.response_mode)],
+          ["fixed_status",  cfg.fixed_status != null ? escapeHtml(cfg.fixed_status) : "—"],
+          ["richness_level",escapeHtml(cfg.richness_level)],
+        ];
+        const trs = rows.map(([k, v]) =>
+          `<tr>
+            <td style="padding:3px 12px 3px 0; font-weight:600; font-size:0.82rem; white-space:nowrap; color:var(--text,#222);">${k}</td>
+            <td class="mono" style="padding:3px 0; font-size:0.82rem; color:var(--text,#222);">${v}</td>
+          </tr>`
+        ).join("");
+        outputEl.innerHTML = `<table style="border-collapse:collapse;">${trs}</table>`;
+      }
+    } catch (err) {
+      if (statusEl) statusEl.textContent = `Resolve failed: ${err.message || "request_failed"}`;
+    }
+  }
+
+  // ── Boot ───────────────────────────────────────────────────────────────────
+  renderFeatureStatus();
+  loadState().then(() => {
+    loadAnalytics();
+  });
+</script>
+{% endblock %}
