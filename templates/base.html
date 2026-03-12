@@ -7,6 +7,8 @@
     <link rel="icon" type="image/png" href="/static/favicon.png?v=20260207" />
     <link rel="shortcut icon" type="image/png" href="/static/favicon.png?v=20260207" />
     <link rel="stylesheet" href="/static/style.css?v=20260306" />
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/flatpickr/dist/themes/dark.min.css">
+    <script src="https://cdn.jsdelivr.net/npm/flatpickr"></script>
     <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
   </head>
   <body>
@@ -15,12 +17,7 @@
         <div class="brand">NoctisAPI</div>
         <a class="link" href="/dashboard">Dashboard</a>
         <a class="link" href="/dashboard/actors">Actors</a>
-        {% if "cases" in license_features %}
-        <a class="link" href="/dashboard/cases">Cases</a>
-        {% endif %}
-        {% if "campaigns" in license_features %}
-        <a class="link" href="/dashboard/campaigns">Campaigns</a>
-        {% endif %}
+        <a class="link" href="/dashboard/api-modular">API Modular</a>
         <a class="link" href="/dashboard/actors/deleted">Deleted</a>
         <a class="link" href="/dashboard/honeypot">API Health</a>
         <a class="link" href="/dashboard/environment">Environment</a>

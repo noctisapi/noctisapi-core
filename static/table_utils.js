@@ -14,16 +14,6 @@
     return thead.querySelector('tr.header') || thead.querySelector('tr');
   }
 
-  function makeDateInput(idx, role, ariaLabel){
-    const input = document.createElement('input');
-    input.type = 'date';
-    input.className = 'table-filter table-filter-date';
-    input.dataset.col = String(idx);
-    input.dataset.role = role;
-    input.setAttribute('aria-label', ariaLabel);
-    return input;
-  }
-
   function ensureFilterRow(thead, headerCells, noFilters){
     if(noFilters) return null;
     let filterRow = thead.querySelector('tr.table-filters');
@@ -34,12 +24,38 @@
       const cell = document.createElement('th');
       const type = (th.dataset && th.dataset.type) ? th.dataset.type : 'text';
       const label = (th.textContent || '').trim();
-      if(type === 'date'){
-        const wrapper = document.createElement('span');
-        wrapper.className = 'date-range-filter';
-        wrapper.appendChild(makeDateInput(idx, 'from', `${label} from`));
-        wrapper.appendChild(makeDateInput(idx, 'to',   `${label} to`));
-        cell.appendChild(wrapper);
+      if(type === 'none'){
+        // action / checkbox columns — no filter control
+      } else if(type === 'date'){
+        const input = document.createElement('input');
+        input.type = 'text';
+        input.className = 'table-filter table-filter-date';
+        input.dataset.col = String(idx);
+        input.placeholder = label || 'Date';
+        input.setAttribute('aria-label', label ? `${label} date range` : 'Date range');
+        input.readOnly = true;
+        cell.appendChild(input);
+      } else if(type === 'select'){
+        const sel = document.createElement('select');
+        sel.className = 'table-filter';
+        sel.dataset.col = String(idx);
+        sel.setAttribute('aria-label', `Filter ${label}`);
+        const allOpt = document.createElement('option');
+        allOpt.value = '';
+        allOpt.textContent = 'All';
+        sel.appendChild(allOpt);
+        const rawOpts = (th.dataset && th.dataset.options) ? th.dataset.options : '';
+        if(rawOpts){
+          try{
+            JSON.parse(rawOpts).forEach(o => {
+              const opt = document.createElement('option');
+              opt.value = String(o).toLowerCase();
+              opt.textContent = String(o);
+              sel.appendChild(opt);
+            });
+          }catch(e){}
+        }
+        cell.appendChild(sel);
       } else {
         const input = document.createElement('input');
         input.className = 'table-filter';
@@ -52,6 +68,11 @@
       filterRow.appendChild(cell);
     });
     thead.appendChild(filterRow);
+    if(typeof flatpickr !== 'undefined'){
+      filterRow.querySelectorAll('.table-filter-date').forEach(inp => {
+        flatpickr(inp, { mode: 'range', dateFormat: 'Y-m-d', disableMobile: true });
+      });
+    }
     return filterRow;
   }
 
@@ -170,23 +191,24 @@
 
     function collectFilters(){
       activeFilters = [];
-      const dateRanges = new Map(); // col idx -> {from, to}
       filterInputs.forEach(input => {
         const idx = parseInt(input.dataset.col, 10);
         const type = headerCells[idx]?.dataset?.type || 'text';
+        const val = (input.value || '').trim();
+        if(!val) return;
         if(type === 'date'){
-          if(!dateRanges.has(idx)) dateRanges.set(idx, {from:'', to:''});
-          const val = input.value.trim();
-          if(input.dataset.role === 'from') dateRanges.get(idx).from = val;
-          else if(input.dataset.role === 'to') dateRanges.get(idx).to = val;
+          let from = '', to = '';
+          if(val.includes(' to ')){
+            const parts = val.split(' to ');
+            from = parts[0].trim();
+            to   = parts[1].trim();
+          } else {
+            from = to = val;
+          }
+          activeFilters.push({ idx, type: 'date', from, to });
           return;
         }
-        const filter = input.value.trim();
-        if(!filter) return;
-        activeFilters.push({ idx, type, value: filter.toLowerCase() });
-      });
-      dateRanges.forEach(({from, to}, idx) => {
-        if(from || to) activeFilters.push({ idx, type: 'date', from, to });
+        activeFilters.push({ idx, type, value: val.toLowerCase() });
       });
     }
 
@@ -211,6 +233,9 @@
         if(filter.from && key < filter.from) return false;
         if(filter.to   && key > filter.to)   return false;
         return true;
+      }
+      if(type === 'select'){
+        return getLower(row, idx) === filter.value;
       }
       return getLower(row, idx).includes(filter.value);
     }
