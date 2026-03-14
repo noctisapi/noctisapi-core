@@ -116,7 +116,7 @@
             <td>{{ e.kind }}</td>
             <td class="mono">{{ e.method }}</td>
             <td class="mono" title="{{ e.path }}">{{ e.path }}</td>
-            <td class="mono">
+            <td class="mono ip-cell">
               {% if e.geo_flag %}{{ e.geo_flag }} {% endif %}
               {{ e.ip or '-' }}
             </td>

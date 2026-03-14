@@ -624,6 +624,10 @@ h1{ margin:6px 0 4px; font-size:26px; }
 .small-text{ font-size:12px; }
 .tiny-text{ font-size:11px; color:var(--muted); }
 .clip{ max-width:520px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+.ip-cell{
+  white-space:nowrap;
+  word-break:normal;
+}
 .code-block{
   margin:8px 0 0;
   padding:10px 12px;
