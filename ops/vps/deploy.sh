@@ -4,6 +4,7 @@ set -euo pipefail
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
 COMPOSE_FILE="${COMPOSE_FILE:-${ROOT_DIR}/compose/docker-compose.prod.yml}"
 ENV_FILE="${ENV_FILE:-${ROOT_DIR}/.env.prod}"
+PROJECT_NAME="${COMPOSE_PROJECT_NAME:-shadowapi-core}"
 
 if [ ! -f "${ENV_FILE}" ]; then
   echo "ERROR: ${ENV_FILE} not found. Create it before deploying." >&2
@@ -29,16 +30,17 @@ if [ "${#missing[@]}" -gt 0 ]; then
 fi
 
 echo "Deploying from:"
+echo "  PROJECT_NAME=${PROJECT_NAME}"
 echo "  COMPOSE_FILE=${COMPOSE_FILE}"
 echo "  ENV_FILE=${ENV_FILE}"
 
 cd "${ROOT_DIR}"
 
 echo "Pulling images..."
-docker compose --env-file "${ENV_FILE}" -f "${COMPOSE_FILE}" pull
+docker compose -p "${PROJECT_NAME}" --env-file "${ENV_FILE}" -f "${COMPOSE_FILE}" pull
 
 echo "Starting services..."
-docker compose --env-file "${ENV_FILE}" -f "${COMPOSE_FILE}" up -d --remove-orphans
+docker compose -p "${PROJECT_NAME}" --env-file "${ENV_FILE}" -f "${COMPOSE_FILE}" up -d --remove-orphans
 
 echo "Pruning unused images..."
 docker image prune -f >/dev/null 2>&1 || true

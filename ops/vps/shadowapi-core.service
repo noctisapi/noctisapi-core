@@ -7,8 +7,8 @@ After=docker.service
 Type=oneshot
 RemainAfterExit=yes
 WorkingDirectory=/opt/noctisapi-core
-ExecStart=/usr/bin/docker compose -f compose/docker-compose.prod.yml --env-file .env.prod up -d
-ExecStop=/usr/bin/docker compose -f compose/docker-compose.prod.yml --env-file .env.prod down
+ExecStart=/usr/bin/docker compose -p shadowapi-core -f compose/docker-compose.prod.yml --env-file .env.prod up -d
+ExecStop=/usr/bin/docker compose -p shadowapi-core -f compose/docker-compose.prod.yml --env-file .env.prod down
 TimeoutStartSec=0
 TimeoutStopSec=120
 
