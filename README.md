@@ -148,7 +148,13 @@ See `.env.prod.example` for the full annotated reference.
 
 ## Screenshots
 
-> _Admin panel screenshots coming soon._
+| Dashboard | Actors |
+|---|---|
+| ![Dashboard](screenshots/dashboard.png) | ![Actors](screenshots/actors.png) |
+
+| API Modular | API Health |
+|---|---|
+| ![API Modular](screenshots/api_modular.png) | ![API Health](screenshots/api_health.png) |
 
 ---
 
