@@ -151,7 +151,31 @@ def resolve_client_ip(request: Request) -> str:
     Returns the direct socket IP unchanged when the connection does not
     come from a trusted proxy, preventing header injection by external
     clients.
+
+    The result is cached in ``request.state._client_ip_resolved`` so that
+    repeated calls within the same request lifecycle do not re-evaluate
+    headers or emit duplicate warnings.
     """
+    # Return cached result for this request (prevents duplicate warning logs)
+    try:
+        cached = request.state._client_ip_resolved
+        if cached is not None:
+            return cached
+    except AttributeError:
+        pass
+
+    result = _resolve_client_ip_uncached(request)
+
+    try:
+        request.state._client_ip_resolved = result
+    except Exception:
+        pass
+
+    return result
+
+
+def _resolve_client_ip_uncached(request: Request) -> str:
+    """Internal: compute the client IP without consulting or writing the cache."""
     remote_addr: str = (
         request.client.host if request.client else None
     ) or "0.0.0.0"
