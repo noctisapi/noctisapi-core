@@ -24,6 +24,12 @@
     <div class="kpi-label">Max stage reached</div>
     <div class="kpi-value">S{{ kpi.stage_max }}</div>
   </div>
+  <div class="kpi-card" style="cursor:pointer;" onclick="location.href='/dashboard/alerts'" title="Critical events in last 24h">
+    <div class="kpi-label">Critical (24h)</div>
+    <div class="kpi-value" style="{% if kpi.critical_alerts_24h > 0 %}color:#ff6b6b;{% endif %}">
+      {{ kpi.critical_alerts_24h }}
+    </div>
+  </div>
 </section>
 
 <section class="section-grid">

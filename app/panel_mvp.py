@@ -653,6 +653,14 @@ def dashboard_overview(request: Request):
         active_7d = int(cur.fetchone()["cnt"] or 0)
         cur.execute("SELECT COUNT(*) AS cnt FROM events")
         events_total = int(cur.fetchone()["cnt"] or 0)
+        cur.execute(
+            """
+            SELECT COUNT(*) AS cnt FROM events
+            WHERE kind IN ('root_console','cloud_metadata','infra_vault')
+              AND ts >= datetime('now', '-24 hours')
+            """
+        )
+        critical_alerts_24h = int(cur.fetchone()["cnt"] or 0)
 
         stage_max = 0
         if has_sessions:
@@ -731,6 +739,7 @@ def dashboard_overview(request: Request):
                     "active_7d": active_7d,
                     "events_total": events_total,
                     "stage_max": stage_max,
+                    "critical_alerts_24h": critical_alerts_24h,
                 },
                 "events_by_day": events_by_day,
                 "actors_new": actors_new,
@@ -773,11 +782,22 @@ def dashboard(request: Request):
             LEFT JOIN last_events le ON le.actor_id = a.actor_id
             WHERE COALESCE(a.lifecycle_state, 'active') != 'deleted'
               AND EXISTS (SELECT 1 FROM events e WHERE e.actor_id = a.actor_id)
+              AND a.last_seen >= datetime('now', '-2 days')
             ORDER BY a.last_seen DESC
-            LIMIT 200
+            LIMIT 50
             """
         )
         actors = [dict(r) for r in cur.fetchall()]
+        # Count actors outside the 48h window so the template can show an upgrade nudge
+        cur.execute(
+            """
+            SELECT COUNT(*) AS cnt FROM actors
+            WHERE COALESCE(lifecycle_state, 'active') != 'deleted'
+              AND EXISTS (SELECT 1 FROM events e WHERE e.actor_id = actors.actor_id)
+              AND last_seen < datetime('now', '-2 days')
+            """
+        )
+        actors_hidden = int(cur.fetchone()["cnt"] or 0)
         cur.execute("SELECT COALESCE(MAX(stage_max), 0) AS max_stage FROM sessions")
         max_stage_row = cur.fetchone()
         max_stage = int(max_stage_row["max_stage"] or 0) if max_stage_row else 0
@@ -826,7 +846,7 @@ def dashboard(request: Request):
 
         return templates.TemplateResponse(
             "dashboard.html",
-            {"request": request, "actors": actors, "max_stage": max_stage},
+            {"request": request, "actors": actors, "max_stage": max_stage, "actors_hidden": actors_hidden},
         )
     finally:
         conn.close()
@@ -1028,17 +1048,65 @@ def session_detail(session_id: str, request: Request):
                 sess["duration_seconds"] = None
         else:
             sess["duration_seconds"] = None
-        cur.execute("SELECT * FROM session_steps WHERE session_id=? ORDER BY seq ASC", (session_id,))
+        cur.execute("SELECT COUNT(*) AS cnt FROM session_steps WHERE session_id=?", (session_id,))
+        steps_total = int(cur.fetchone()["cnt"] or 0)
+        # Core: show only first 10 steps. Full history available on Pro.
+        cur.execute("SELECT * FROM session_steps WHERE session_id=? ORDER BY seq ASC LIMIT 10", (session_id,))
         steps = [dict(r) for r in cur.fetchall()]
         return templates.TemplateResponse(
             "session_detail.html",
-            {"request": request, "session": sess, "steps": steps},
+            {"request": request, "session": sess, "steps": steps,
+             "steps_total": steps_total, "steps_cap": 10},
         )
     finally:
         conn.close()
 
 
 
+
+
+@app.get("/dashboard/alerts", response_class=HTMLResponse)
+def dashboard_alerts(request: Request):
+    """Critical-event feed — Core edition (24h, top 10, IP + kind only)."""
+    _CRITICAL_KINDS = ("root_console", "cloud_metadata", "infra_vault")
+    conn = db()
+    try:
+        cur = conn.cursor()
+        cur.execute(
+            """
+            SELECT e.id, e.ts, e.kind, e.path, e.method, e.ip, e.status, e.extra_json
+            FROM events e
+            WHERE e.kind IN ('root_console', 'cloud_metadata', 'infra_vault')
+              AND e.ts >= datetime('now', '-24 hours')
+            ORDER BY e.ts DESC
+            LIMIT 10
+            """,
+        )
+        rows = [dict(r) for r in cur.fetchall()]
+        for r in rows:
+            try:
+                ex = json.loads(r.get("extra_json") or "{}")
+            except Exception:
+                ex = {}
+            r["points_delta"] = ex.get("points_delta", "—")
+            r["scanner"] = ex.get("scanner", False)
+        cur.execute(
+            """
+            SELECT COUNT(*) AS total,
+                   COUNT(DISTINCT ip) AS unique_ips
+            FROM events
+            WHERE kind IN ('root_console', 'cloud_metadata', 'infra_vault')
+              AND ts >= datetime('now', '-24 hours')
+            """
+        )
+        stats_row = cur.fetchone()
+        stats = dict(stats_row) if stats_row else {"total": 0, "unique_ips": 0}
+        return templates.TemplateResponse(
+            "alerts.html",
+            {"request": request, "events": rows, "stats": stats, **_license_context()},
+        )
+    finally:
+        conn.close()
 
 
 @app.get("/dashboard/debug/db")

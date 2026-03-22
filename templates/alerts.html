@@ -1,0 +1,117 @@
+{% extends "base.html" %}
+{% block content %}
+<style>
+  .kind-pill {
+    display: inline-block;
+    padding: 2px 8px;
+    border-radius: 4px;
+    font-size: 0.72rem;
+    font-family: monospace;
+    font-weight: 700;
+  }
+  .kind-critical {
+    background: rgba(255,107,107,.15);
+    color: #ff6b6b;
+    border: 1px solid rgba(255,107,107,.3);
+  }
+  .core-limit-banner {
+    background: rgba(122,184,245,.06);
+    border: 1px solid rgba(122,184,245,.2);
+    border-radius: 8px;
+    padding: 14px 20px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    flex-wrap: wrap;
+    gap: 12px;
+    margin-bottom: 20px;
+    font-size: 0.82rem;
+    color: var(--muted);
+  }
+  .core-limit-banner strong { color: var(--text); }
+  .core-limit-banner a { color: #7ab8f5; font-weight: 600; text-decoration: none; }
+  .core-limit-banner a:hover { text-decoration: underline; }
+</style>
+
+<div style="padding: 24px 0 0 0;">
+  <div style="display:flex; align-items:center; justify-content:space-between; margin-bottom:20px; flex-wrap:wrap; gap:12px;">
+    <div>
+      <h1 style="margin:0; font-size:1.4rem;">Critical Alerts</h1>
+      <p class="muted" style="margin:4px 0 0 0; font-size:0.82rem;">
+        Root access, cloud metadata, and vault credential attempts — last 24h
+      </p>
+    </div>
+    <button class="btn" onclick="location.reload()" style="font-size:0.78rem; padding:4px 12px;">Refresh</button>
+  </div>
+
+  <!-- Core limitation banner -->
+  <div class="core-limit-banner">
+    <div>
+      <strong>Core edition</strong> — showing critical-tier events only (root_console, cloud_metadata, infra_vault), last 24h, max 10.
+      Pro unlocks all high-signal kinds, full history, actor deep-links, and configurable thresholds.
+    </div>
+    <a href="https://noctisapi.com/#pricing" target="_blank" rel="noopener">Upgrade to Pro →</a>
+  </div>
+
+  <!-- Stats -->
+  <div style="display:flex; gap:16px; flex-wrap:wrap; margin-bottom:20px;">
+    <div style="background:var(--card-bg,#1a1a2e);border:1px solid var(--border,rgba(255,255,255,.1));border-radius:8px;padding:14px 22px;min-width:120px;">
+      <div style="font-size:2rem;font-weight:700;color:#ff6b6b;">{{ stats.total }}</div>
+      <div style="font-size:0.72rem;color:var(--muted);text-transform:uppercase;letter-spacing:.05em;">Critical (24h)</div>
+    </div>
+    <div style="background:var(--card-bg,#1a1a2e);border:1px solid var(--border,rgba(255,255,255,.1));border-radius:8px;padding:14px 22px;min-width:120px;">
+      <div style="font-size:2rem;font-weight:700;color:#7ab8f5;">{{ stats.unique_ips }}</div>
+      <div style="font-size:0.72rem;color:var(--muted);text-transform:uppercase;letter-spacing:.05em;">Distinct IPs</div>
+    </div>
+  </div>
+
+  {% if events %}
+  <div class="table-wrap" style="overflow-x:auto;">
+    <table class="data-table" style="min-width:600px;">
+      <thead>
+        <tr>
+          <th style="width:140px;">Time (UTC)</th>
+          <th style="width:110px;">Source IP</th>
+          <th style="width:160px;">Kind</th>
+          <th>Path</th>
+          <th style="width:70px;">Status</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for e in events %}
+        <tr>
+          <td class="muted" style="font-size:0.8rem;white-space:nowrap;">{{ e.ts[:19] if e.ts else "—" }}</td>
+          <td class="mono" style="font-size:0.8rem;">{{ e.ip or "—" }}</td>
+          <td>
+            <span class="kind-pill kind-critical">{{ e.kind }}</span>
+            {% if e.scanner %}<span style="display:inline-block;padding:1px 5px;font-size:0.68rem;font-weight:700;background:rgba(189,86,255,.18);color:#bd56ff;border:1px solid rgba(189,86,255,.3);border-radius:3px;margin-left:4px;">SCANNER</span>{% endif %}
+          </td>
+          <td class="mono" style="font-size:0.78rem;max-width:260px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;" title="{{ e.path }}">{{ e.path or "—" }}</td>
+          <td class="muted" style="text-align:center;">{{ e.status or "—" }}</td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+
+  <p class="muted" style="font-size:0.75rem;margin-top:12px;text-align:right;">
+    Showing up to 10 events from the last 24h.
+    <a href="https://noctisapi.com/#pricing" target="_blank" rel="noopener" style="color:#7ab8f5;">Pro shows all →</a>
+  </p>
+
+  {% else %}
+  <div style="text-align:center;padding:60px 0;color:var(--muted);">
+    <div style="font-size:2.5rem;margin-bottom:12px;">🛡️</div>
+    <p>No critical events in the last 24h.</p>
+    <p style="font-size:0.82rem;">Root console, cloud metadata, and vault attempts will appear here.</p>
+  </div>
+  {% endif %}
+
+  <!-- Webhook config hint -->
+  <div style="margin-top:32px;padding:14px 18px;background:rgba(255,255,255,.03);border:1px solid rgba(255,255,255,.07);border-radius:8px;font-size:0.8rem;color:var(--muted);">
+    <strong style="color:var(--text);">Get alerted instantly</strong> — set <code>HP_ALERT_WEBHOOK_URL</code> in
+    <a href="/dashboard/environment">Environment Settings</a> to receive a webhook when a critical event fires.
+    Supports Slack and Discord.
+  </div>
+</div>
+{% endblock %}

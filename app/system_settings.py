@@ -47,6 +47,9 @@ _EDITABLE_KEYS: frozenset[str] = frozenset(
         # Timeouts
         "REQUEST_TIMEOUT",
         "KEEPALIVE_TIMEOUT",
+        # Critical-event alerting (Core: fires only for root_console, cloud_metadata, infra_vault)
+        "HP_ALERT_WEBHOOK_URL",
+        "HP_ALERT_WEBHOOK_FORMAT",
     }
 )
 
@@ -70,6 +73,8 @@ KEY_LABELS: dict[str, str] = {
     "TRUSTED_PROXIES": "Trusted Proxies",
     "REQUEST_TIMEOUT": "Request Timeout (s)",
     "KEEPALIVE_TIMEOUT": "Keepalive Timeout (s)",
+    "HP_ALERT_WEBHOOK_URL": "Alert Webhook URL (critical events only)",
+    "HP_ALERT_WEBHOOK_FORMAT": "Alert Webhook Format (slack / discord / json)",
 }
 
 # Group keys by category for ordered display in the UI
@@ -78,6 +83,7 @@ KEY_GROUPS: list[tuple[str, list[str]]] = [
     ("Logging", ["LOG_LEVEL", "LOG_FORMAT", "LOG_SYSLOG_HOST", "LOG_SYSLOG_PORT", "LOG_SYSLOG_SOCKTYPE", "LOG_SYSLOG_FACILITY"]),
     ("Reverse Proxy", ["PUBLIC_BASE_URL", "TRUSTED_PROXIES"]),
     ("Timeouts", ["REQUEST_TIMEOUT", "KEEPALIVE_TIMEOUT"]),
+    ("Alerting", ["HP_ALERT_WEBHOOK_URL", "HP_ALERT_WEBHOOK_FORMAT"]),
 ]
 
 

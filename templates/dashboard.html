@@ -45,7 +45,7 @@
 <div class="page-head">
   <div>
     <h1>Actors</h1>
-    <div class="sub">Latest 200 &middot; sorted by activity</div>
+    <div class="sub">Last 48h &middot; max 50 &middot; sorted by activity</div>
     <div id="refreshBar">
       <span id="refreshDot" class="live"></span>
       <span id="refreshLabel">Live · refreshes when idle</span>
@@ -102,7 +102,7 @@
         <tr>
           <th data-type="text">Actor</th>
           <th data-type="number" style="width:75px;">Stage</th>
-          <th data-type="number" style="width:75px;">Score</th>
+          <th data-type="text" style="width:90px;">Risk</th>
           <th data-type="text">Signals</th>
           <th data-type="text" style="width:160px;">IP</th>
           <th data-type="text">User-Agent</th>
@@ -114,6 +114,8 @@
         {% for a in actors %}
         {% set stage = a.stage or 0 %}
         {% set score = a.score or 0 %}
+        {% set risk_tier = "Critical" if stage >= 6 else "High" if stage >= 4 else "Medium" if stage >= 2 else "Low" %}
+        {% set risk_class = "score-hi" if stage >= 6 else "score-hi" if stage >= 4 else "score-med" if stage >= 2 else "score-low" %}
         <tr data-actor="{{ a.actor_id }}" data-ip="{{ a.last_ip or '' }}" data-ua="{{ a.last_ua or '' }}" data-stage="{{ stage }}" data-score="{{ score }}">
           <td>
             <a class="link" href="/actor/{{ a.actor_id }}" style="font-weight:600;font-family:monospace;font-size:0.83rem;">{{ a.short }}</a>
@@ -122,7 +124,7 @@
             <span class="stage-pill sp-{{ [stage, 4]|min }}">S{{ stage }}</span>
           </td>
           <td>
-            <span class="{% if score >= 7 %}score-hi{% elif score >= 4 %}score-med{% else %}score-low{% endif %} mono">{{ score }}</span>
+            <span class="{{ risk_class }}" style="font-size:0.8rem;">{{ risk_tier }}</span>
           </td>
           <td>
             {% for b in a.badges %}
@@ -145,6 +147,18 @@
       </tbody>
     </table>
   </div>
+
+  {% if actors_hidden > 0 %}
+  <div style="padding:12px 16px;border-top:1px solid rgba(255,255,255,.07);display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:8px;">
+    <span class="muted" style="font-size:0.82rem;">
+      🔒 <strong style="color:var(--text);">{{ actors_hidden }} actor{{ 's' if actors_hidden != 1 else '' }}</strong>
+      hidden — activity older than 48h is not shown in Core.
+    </span>
+    <a href="https://noctisapi.com/#pricing" target="_blank" rel="noopener" class="btn btn-outline btn-small">
+      Upgrade to Pro for full history →
+    </a>
+  </div>
+  {% endif %}
 </div>
 
 <script>

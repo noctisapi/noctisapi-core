@@ -29,6 +29,7 @@ from app.reverse_proxy import ReverseProxyMiddleware, get_static_public_base_url
 from app import health as _health
 from app.server_config import RequestTimeoutMiddleware, get_request_timeout
 from app.structured_logging import set_request_id
+from app import alert_dispatcher
 
 APP_TITLE = os.getenv("HP_API_TITLE", "Account Service API")
 APP_VERSION = os.getenv("HP_API_VERSION", "1.0.0")
@@ -1152,6 +1153,21 @@ async def log_all_requests(request: Request, call_next):
                     )
 
                 conn.commit()
+
+                # Critical-event webhook alert (non-blocking, never raises)
+                # Core edition: fires only for root_console, cloud_metadata, infra_vault
+                _event_score_delta = int((hp_event.get("points") if hp_event else None) or _score_for(kind))
+                _current_actor_score = _actor_score(conn, actor_id)
+                alert_dispatcher.fire_if_high_signal(
+                    kind=kind,
+                    actor_id=actor_id,
+                    ip=_client_ip(request),
+                    ua=_user_agent(request),
+                    path=request.url.path,
+                    score_delta=_event_score_delta,
+                    trap_flags=(hp_event.get("trap_flags") if hp_event else None) or [],
+                    current_score=_current_actor_score,
+                )
             finally:
                 conn.close()
 

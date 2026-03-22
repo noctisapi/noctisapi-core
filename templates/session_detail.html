@@ -50,7 +50,16 @@
 <div id="sessionToast" class="toast" role="status" aria-live="polite"></div>
 
 <div class="card">
-  <div class="card-head"><div class="card-title">Steps ({{ steps|length }})</div></div>
+  <div class="card-head">
+    <div class="card-title">
+      Steps ({{ steps|length }}{% if steps_total is defined and steps_total > steps_cap %} of {{ steps_total }}{% endif %})
+    </div>
+    {% if steps_total is defined and steps_total > steps_cap %}
+    <div class="card-sub" style="color:#ffa94d;font-size:0.78rem;">
+      Core: showing first {{ steps_cap }} steps
+    </div>
+    {% endif %}
+  </div>
   <div style="padding:8px 14px;border-bottom:1px solid var(--stroke);display:flex;gap:8px;flex-wrap:wrap;align-items:center;">
     <select id="filterMethod" class="table-filter" style="width:120px;flex:none;" onchange="applyStepFilters()" aria-label="Filter method">
       <option value="">All methods</option>
@@ -122,6 +131,20 @@
       </tbody>
     </table>
   </div>
+
+  {% if steps_total is defined and steps_total > steps_cap %}
+  <div style="padding:16px 20px;border-top:1px solid rgba(255,169,77,.2);background:rgba(255,169,77,.04);display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:10px;">
+    <div>
+      <span style="color:#ffa94d;font-weight:600;">{{ steps_total - steps_cap }} more steps hidden</span>
+      <span class="muted" style="font-size:0.82rem;margin-left:6px;">
+        This actor made {{ steps_total }} requests. You're seeing {{ steps_cap }}.
+      </span>
+    </div>
+    <a href="https://noctisapi.com/#pricing" target="_blank" rel="noopener" class="btn btn-outline btn-small">
+      See the full attack chain → Pro
+    </a>
+  </div>
+  {% endif %}
 </div>
 
 <script>
