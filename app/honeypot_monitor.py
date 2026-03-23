@@ -13,8 +13,9 @@ from app.tls_config import get_ssl_context
 
 HoneypotDBFactory = Callable[[], sqlite3.Connection]
 
-HONEYPOT_PUBLIC_BASE_URL = os.getenv("HONEYPOT_PUBLIC_BASE_URL", "").strip().rstrip("/")
-HONEYPOT_MONITOR_BASE_URL = os.getenv("HONEYPOT_MONITOR_BASE_URL", "").strip().rstrip("/")
+_hp_host = os.getenv("HP_PUBLIC_HOST", "").strip().rstrip("/")
+HONEYPOT_PUBLIC_BASE_URL = (os.getenv("HONEYPOT_PUBLIC_BASE_URL") or ("https://" + _hp_host if _hp_host else "")).strip().rstrip("/")
+HONEYPOT_MONITOR_BASE_URL = os.getenv("HONEYPOT_MONITOR_BASE_URL", "http://app:8000").strip().rstrip("/")
 HONEYPOT_CHECK_INTERVAL = max(15, int(os.getenv("HONEYPOT_CHECK_INTERVAL", "60")))
 HONEYPOT_CHECK_TIMEOUT = float(os.getenv("HONEYPOT_CHECK_TIMEOUT", "5"))
 HONEYPOT_CHECK_RETENTION_SECONDS = int(os.getenv("HONEYPOT_CHECK_RETENTION_SECONDS", str(7 * 24 * 3600)))

@@ -29,7 +29,10 @@ _logger = logging.getLogger(__name__)
 APP_NAME = "noctisapi-panel"
 DB_PATH = os.getenv("HP_DB_PATH", "/data/honeypot.db")
 HP_GEOIP_DB = os.getenv("HP_GEOIP_DB", "/data/GeoLite2-Country.mmdb")
-HP_PUBLIC_BASE_URL = (os.getenv("HP_PUBLIC_BASE_URL") or "").strip().rstrip("/")
+_hp_host = os.getenv("HP_PUBLIC_HOST", "").strip().rstrip("/")
+HP_PUBLIC_BASE_URL = (
+    os.getenv("HP_PUBLIC_BASE_URL") or ("https://" + _hp_host if _hp_host else "")
+).strip().rstrip("/")
 _HP_MONITOR_SECRET = os.getenv("HP_MONITOR_SECRET", "").strip()
 API_CATALOG_LOCK = threading.Lock()
 API_CATALOG_CACHE: dict = {"ts": 0, "catalog": [], "source": "none", "error": ""}

@@ -38,7 +38,11 @@ DB_PATH = os.getenv("HP_DB_PATH", "/data/honeypot.db")
 HP_SEED = os.getenv("HP_SEED", "CHANGE_ME_LONG_RANDOM_SEED")
 HP_REQUIRE_SEED = (os.getenv("HP_REQUIRE_SEED", "") or "").strip().lower() in ("1", "true", "yes")
 HONEYPOT_MONITOR_UA = os.getenv("HONEYPOT_MONITOR_UA", "HealthCheck/1.0")
-HP_PUBLIC_BASE_URL = os.getenv("HP_PUBLIC_BASE_URL", "http://127.0.0.1:8080").rstrip("/")
+_hp_host = os.getenv("HP_PUBLIC_HOST", "").strip().rstrip("/")
+HP_PUBLIC_BASE_URL = (
+    os.getenv("HP_PUBLIC_BASE_URL")
+    or ("https://" + _hp_host if _hp_host else "http://127.0.0.1:8080")
+).rstrip("/")
 HP_ACTOR_UA_MODE = os.getenv("HP_ACTOR_UA_MODE", "family").strip().lower()
 # Monitor bypass requires a secret; if unset the bypass is disabled entirely.
 _HP_MONITOR_SECRET = os.getenv("HP_MONITOR_SECRET", "").strip()
