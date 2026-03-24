@@ -42,3 +42,7 @@ Thumbs.db
 # Build / cache
 dist/
 build/
+
+# Local test scripts (not for distribution)
+test_chain.sh
+test_critical.sh
