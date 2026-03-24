@@ -781,7 +781,8 @@ def dashboard(request: Request):
               AND a.last_seen >= datetime('now', '-2 days')
             """
         )
-        total_actors = int((cur.fetchone() or {}).get("n") or 0)
+        _count_row = cur.fetchone()
+        total_actors = int(_count_row["n"] if _count_row else 0)
         total_pages = max(1, (total_actors + per_page - 1) // per_page)
         page = min(page, total_pages)
         offset = (page - 1) * per_page
