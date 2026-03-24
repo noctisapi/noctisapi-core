@@ -756,6 +756,14 @@ def dashboard_overview(request: Request):
         conn.close()
 
 
+_ACTOR_SORT_COLS = {
+    "last_seen": "a.last_seen",
+    "score":     "a.score",
+    "actor_id":  "a.actor_id",
+    "last_ip":   "le.ip",
+}
+
+
 @app.get("/dashboard/actors", response_class=HTMLResponse)
 def dashboard(request: Request):
     try:
@@ -766,6 +774,15 @@ def dashboard(request: Request):
         per_page = min(200, max(10, int(request.query_params.get("per_page") or 50)))
     except (ValueError, TypeError):
         per_page = 50
+
+    sort = request.query_params.get("sort") or "last_seen"
+    if sort not in _ACTOR_SORT_COLS:
+        sort = "last_seen"
+    dir_ = request.query_params.get("dir") or "desc"
+    if dir_ not in ("asc", "desc"):
+        dir_ = "desc"
+    order_sql = f"{_ACTOR_SORT_COLS[sort]} {dir_.upper()}, a.last_seen DESC"
+
     offset = (page - 1) * per_page
 
     conn = db()
@@ -820,9 +837,9 @@ def dashboard(request: Request):
             LEFT JOIN events gf_ev ON gf_ev.id = gf.geo_id
             WHERE COALESCE(a.lifecycle_state, 'active') != 'deleted'
               AND a.last_seen >= datetime('now', '-2 days')
-            ORDER BY a.last_seen DESC
+            ORDER BY {order_sql}
             LIMIT ? OFFSET ?
-            """,
+            """.format(order_sql=order_sql),
             (per_page, offset),
         )
         actors = [dict(r) for r in cur.fetchall()]
@@ -893,6 +910,8 @@ def dashboard(request: Request):
                 "per_page": per_page,
                 "total_actors": total_actors,
                 "total_pages": total_pages,
+                "sort": sort,
+                "dir": dir_,
             },
         )
     finally:

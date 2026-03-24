@@ -40,6 +40,12 @@
   #refreshDot.live { background: #7ee2b8; box-shadow: 0 0 5px #7ee2b8; animation: pulse 2s infinite; }
   #refreshDot.paused { background: #ffc940; }
   @keyframes pulse { 0%,100%{opacity:1} 50%{opacity:.4} }
+  /* Server-side sort headers */
+  th.th-sort { cursor: pointer; user-select: none; white-space: nowrap; }
+  th.th-sort a { color: inherit; text-decoration: none; display: block; }
+  th.th-sort a:hover { color: var(--accent); }
+  th.th-sort[data-sort-dir="asc"]::after  { content: " ▲"; font-size: 9px; color: var(--accent); }
+  th.th-sort[data-sort-dir="desc"]::after { content: " ▼"; font-size: 9px; color: var(--accent); }
 </style>
 
 <div class="page-head">
@@ -96,17 +102,26 @@
     <button class="btn btn-ghost btn-small" type="button" onclick="clearActorFilter()">Clear</button>
   </div>
 
+  {# Macro for sortable column headers #}
+  {%- macro sort_th(label, col, style="") -%}
+    {%- set active = (sort == col) -%}
+    {%- set next_dir = 'asc' if (active and dir == 'desc') else 'desc' -%}
+    <th class="th-sort" {% if style %}style="{{ style }}"{% endif %} {% if active %}data-sort-dir="{{ dir }}"{% endif %}>
+      <a href="?sort={{ col }}&dir={{ next_dir }}&page=1&per_page={{ per_page }}">{{ label }}</a>
+    </th>
+  {%- endmacro -%}
+
   <div class="table-wrap">
-    <table class="table table-sortable" id="actorsTable" data-no-filters>
+    <table class="table" id="actorsTable">
       <thead>
         <tr>
-          <th data-type="text">Actor</th>
-          <th data-type="number" style="width:75px;">Stage</th>
-          <th data-type="text" style="width:90px;">Risk</th>
-          <th data-type="text">Signals</th>
-          <th data-type="text" style="width:160px;">IP</th>
-          <th data-type="text">User-Agent</th>
-          <th data-type="date" style="width:150px;">Last seen</th>
+          {{ sort_th("Actor", "actor_id") }}
+          {{ sort_th("Stage", "score", "width:75px;") }}
+          <th style="width:90px;">Risk</th>
+          <th>Signals</th>
+          {{ sort_th("IP", "last_ip", "width:160px;") }}
+          <th>User-Agent</th>
+          {{ sort_th("Last seen", "last_seen", "width:150px;") }}
           <th style="width:80px;"></th>
         </tr>
       </thead>
@@ -155,7 +170,7 @@
     </div>
     <div style="display:flex;gap:6px;align-items:center;">
       {% if page > 1 %}
-        <a href="?page={{ page - 1 }}&per_page={{ per_page }}" class="btn btn-ghost btn-small">&laquo; Prev</a>
+        <a href="?sort={{ sort }}&dir={{ dir }}&page={{ page - 1 }}&per_page={{ per_page }}" class="btn btn-ghost btn-small">&laquo; Prev</a>
       {% else %}
         <span class="btn btn-ghost btn-small" style="opacity:.35;pointer-events:none;">&laquo; Prev</span>
       {% endif %}
@@ -163,23 +178,23 @@
       {% set pg_start = [1, page - 2]|max %}
       {% set pg_end   = [total_pages, page + 2]|min %}
       {% if pg_start > 1 %}
-        <a href="?page=1&per_page={{ per_page }}" class="btn btn-ghost btn-small">1</a>
+        <a href="?sort={{ sort }}&dir={{ dir }}&page=1&per_page={{ per_page }}" class="btn btn-ghost btn-small">1</a>
         {% if pg_start > 2 %}<span style="color:var(--muted);padding:0 2px;">…</span>{% endif %}
       {% endif %}
       {% for p in range(pg_start, pg_end + 1) %}
         {% if p == page %}
           <span class="btn btn-small" style="background:var(--accent);color:#fff;border-color:var(--accent);">{{ p }}</span>
         {% else %}
-          <a href="?page={{ p }}&per_page={{ per_page }}" class="btn btn-ghost btn-small">{{ p }}</a>
+          <a href="?sort={{ sort }}&dir={{ dir }}&page={{ p }}&per_page={{ per_page }}" class="btn btn-ghost btn-small">{{ p }}</a>
         {% endif %}
       {% endfor %}
       {% if pg_end < total_pages %}
         {% if pg_end < total_pages - 1 %}<span style="color:var(--muted);padding:0 2px;">…</span>{% endif %}
-        <a href="?page={{ total_pages }}&per_page={{ per_page }}" class="btn btn-ghost btn-small">{{ total_pages }}</a>
+        <a href="?sort={{ sort }}&dir={{ dir }}&page={{ total_pages }}&per_page={{ per_page }}" class="btn btn-ghost btn-small">{{ total_pages }}</a>
       {% endif %}
 
       {% if page < total_pages %}
-        <a href="?page={{ page + 1 }}&per_page={{ per_page }}" class="btn btn-ghost btn-small">Next &raquo;</a>
+        <a href="?sort={{ sort }}&dir={{ dir }}&page={{ page + 1 }}&per_page={{ per_page }}" class="btn btn-ghost btn-small">Next &raquo;</a>
       {% else %}
         <span class="btn btn-ghost btn-small" style="opacity:.35;pointer-events:none;">Next &raquo;</span>
       {% endif %}
