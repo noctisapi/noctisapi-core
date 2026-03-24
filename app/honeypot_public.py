@@ -1558,7 +1558,7 @@ async def auth_login(request: Request):
             token_issued = random.random() < 0.7
             token = None
             if token_issued:
-                token = _fake_jwt(actor_id, scopes)
+                token = _fake_jwt(actor_id, scopes)[:200]
                 stage = _stage_from_actor_score(_actor_score(conn, actor_id))
                 conn.execute(
                     """
@@ -1616,7 +1616,7 @@ async def auth_mfa(request: Request):
             actor_id = _actor_id_from_request(request)
             token = None
             if success:
-                token = _fake_jwt(actor_id, "read write")
+                token = _fake_jwt(actor_id, "read write")[:200]
                 stage = _stage_from_actor_score(_actor_score(conn, actor_id))
                 conn.execute(
                     """
