@@ -432,7 +432,10 @@ def _honeypot_public_endpoint_catalog() -> tuple:
     if HP_PUBLIC_BASE_URL:
         url = f"{HP_PUBLIC_BASE_URL}/openapi.json"
         try:
-            _fetch_headers: dict = {"accept": "application/json"}
+            _fetch_headers: dict = {
+                "accept": "application/json",
+                "user-agent": "HealthCheck/1.0",
+            }
             if _HP_MONITOR_SECRET:
                 _fetch_headers["x-internal-monitor"] = _HP_MONITOR_SECRET
             req = urllib.request.Request(url, headers=_fetch_headers)
