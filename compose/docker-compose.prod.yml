@@ -4,7 +4,7 @@ services:
   migrate:
     image: ${HP_IMAGE:-ghcr.io/noctisapi/noctisapi-core}:${APP_VERSION}
     user: "0:0"
-    command: ["sh", "-c", "chown -R 10001:0 /data && alembic upgrade head"]
+    command: ["sh", "-c", "chown -R 10001:0 /data && python3 -c \"import sqlite3,os; db='/data/honeypot.db'; c=sqlite3.connect(db) if os.path.exists(db) else None; c and (c.execute('DROP TABLE IF EXISTS alembic_version'), c.commit(), c.close())\" && alembic upgrade head"]
     env_file:
       - ../.env.prod
     volumes:
