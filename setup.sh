@@ -16,7 +16,7 @@
 # ─────────────────────────────────────────────────────────────────────────────
 set -euo pipefail
 
-SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]:-$0}")" && pwd)"
 INSTALL_DIR="${SCRIPT_DIR}"
 ENV_FILE="${INSTALL_DIR}/.env.prod"
 COMPOSE_FILE="${INSTALL_DIR}/compose/docker-compose.prod.yml"
@@ -34,11 +34,11 @@ prompt() { echo -e "${BOLD}$*${RESET}"; }
 _ask() {
   local msg="$1" default="${2:-}" answer
   if [[ -n "$default" ]]; then
-    read -r -p "  ${msg} [${default}]: " answer
+    read -r -p "  ${msg} [${default}]: " answer </dev/tty
     echo "${answer:-${default}}"
   else
     while true; do
-      read -r -p "  ${msg}: " answer
+      read -r -p "  ${msg}: " answer </dev/tty
       [[ -n "$answer" ]] && { echo "$answer"; return; }
       echo "    (required)" >&2
     done
@@ -100,7 +100,7 @@ echo ""
 
 if [[ "$AUTO_YES" -eq 0 ]]; then
   prompt "Proceed? [y/N]"
-  read -r yn
+  read -r yn </dev/tty
   [[ "$yn" =~ ^[Yy]$ ]] || { echo "  Aborted."; exit 0; }
 fi
 
