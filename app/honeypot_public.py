@@ -1035,8 +1035,12 @@ async def log_all_requests(request: Request, call_next):
                 )
             finally:
                 _conn_p.close()
+            _logger.warning("[modular] %s %s -> enabled=%s fixed_status=%s",
+                            request.method, _rpath,
+                            _ec["config"].get("enabled"), _ec["config"].get("fixed_status"))
             if not bool(_ec["config"].get("enabled", True)):
                 _fs = int(_ec["config"].get("fixed_status") or 404)
+                _logger.warning("[modular] BLOCKING %s %s -> %d", request.method, _rpath, _fs)
                 return JSONResponse(
                     status_code=_fs,
                     content={"detail": "Not found"},
