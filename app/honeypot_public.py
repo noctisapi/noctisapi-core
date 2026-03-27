@@ -30,6 +30,7 @@ from app import health as _health
 from app.server_config import RequestTimeoutMiddleware, get_request_timeout
 from app.structured_logging import set_request_id
 from app import alert_dispatcher
+from app import api_modular
 
 APP_TITLE = os.getenv("HP_API_TITLE", "Account Service API")
 APP_VERSION = os.getenv("HP_API_VERSION", "1.0.0")
@@ -1011,6 +1012,37 @@ async def log_all_requests(request: Request, call_next):
     body = await request.body()
     _request_id = (request.headers.get("x-request-id") or secrets.token_hex(16)).strip()[:128]
     set_request_id(_request_id)
+
+    # --- endpoint enabled check ---
+    # Paths that are never subject to endpoint config (infrastructure).
+    _SKIP_POLICY_PREFIXES = (
+        "/health", "/ready", "/version",
+        "/docs", "/redoc", "/openapi.json", "/static/",
+    )
+    _rpath = request.url.path
+    if not _is_monitor(request) and not any(
+        _rpath == p or _rpath.startswith(p) for p in _SKIP_POLICY_PREFIXES
+    ):
+        try:
+            _conn_p = _db()
+            try:
+                api_modular.ensure_tables(_conn_p)
+                _ec = api_modular.resolve_endpoint_config(
+                    _conn_p,
+                    path=_rpath,
+                    method=request.method,
+                    ensure_schema=False,
+                )
+            finally:
+                _conn_p.close()
+            if not bool(_ec["config"].get("enabled", True)):
+                _fs = int(_ec["config"].get("fixed_status") or 404)
+                return JSONResponse(
+                    status_code=_fs,
+                    content={"detail": "Not found"},
+                )
+        except Exception:
+            pass  # never block requests due to config lookup failure
 
     t0 = time.perf_counter()
     response = None
