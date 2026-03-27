@@ -1041,8 +1041,8 @@ async def log_all_requests(request: Request, call_next):
                     status_code=_fs,
                     content={"detail": "Not found"},
                 )
-        except Exception:
-            pass  # never block requests due to config lookup failure
+        except Exception as _modular_exc:
+            _logger.warning("[modular] endpoint check failed: %s", _modular_exc)
 
     t0 = time.perf_counter()
     response = None
