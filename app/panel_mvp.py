@@ -543,7 +543,7 @@ def dashboard_api_modular_save_config(payload: dict = Body(default={})):
         ensure_schema(conn)
         api_modular.ensure_tables(conn)
         route_catalog, _catalog_source, _catalog_error = _honeypot_public_endpoint_catalog()
-        if not _is_real_honeypot_endpoint(path, method, route_catalog):
+        if route_catalog and not _is_real_honeypot_endpoint(path, method, route_catalog):
             raise HTTPException(status_code=400, detail="unknown_honeypot_endpoint")
         saved = api_modular.upsert_endpoint_config(conn, path=path, method=method, config=config_raw)
     finally:
@@ -585,7 +585,7 @@ def dashboard_api_modular_apply_template(payload: dict = Body(default={})):
         ensure_schema(conn)
         api_modular.ensure_tables(conn)
         route_catalog, _catalog_source, _catalog_error = _honeypot_public_endpoint_catalog()
-        if not _is_real_honeypot_endpoint(path, method, route_catalog):
+        if route_catalog and not _is_real_honeypot_endpoint(path, method, route_catalog):
             raise HTTPException(status_code=400, detail="unknown_honeypot_endpoint")
         try:
             saved = api_modular.apply_template(conn, template_name=template_name, path=path, method=method)
