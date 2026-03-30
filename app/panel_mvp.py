@@ -1250,7 +1250,7 @@ def actor(actor_id: str, request: Request):
 
         cur.execute(
             """
-            SELECT id, ts, kind, path, method, ip, ua, body_sample, token, extra_json
+            SELECT id, ts, kind, path, method, ip, ua, status, body_sample, token, extra_json
             FROM events
             WHERE actor_id=?
             ORDER BY id DESC
