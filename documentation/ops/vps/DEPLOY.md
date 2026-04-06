@@ -85,7 +85,7 @@ nano .env.prod   # or vim
 ## 4. Geo resolver (for country flags)
 
 Core uses `HP_ASN_RESOLVER_URL=https://ipwho.is/{ip}` by default. No local
-`.mmdb` database or bind mount is required. To use a different resolver, set
+database or bind mount is required. To use a different resolver, set
 `HP_ASN_RESOLVER_URL` to an HTTP endpoint that returns country code/name JSON and
 keeps the `{ip}` placeholder.
 

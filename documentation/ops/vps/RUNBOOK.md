@@ -81,7 +81,7 @@ Traefik handles certificates automatically via ACME HTTP-01.
 
 ## Phase 5.1: Geo resolver (flags)
 Core uses `HP_ASN_RESOLVER_URL=https://ipwho.is/{ip}` by default. No local
-`.mmdb` database is required. To change the resolver, edit `.env.prod`, keep the `{ip}`
+database is required. To change the resolver, edit `.env.prod`, keep the `{ip}`
 placeholder in the URL, and restart `app` and `admin`.
 
 ## Phase 5.2: Data Retention (TTL)
